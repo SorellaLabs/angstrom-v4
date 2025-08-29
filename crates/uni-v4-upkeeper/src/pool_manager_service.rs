@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll}
+    task::{Context, Poll},
 };
 
 use alloy::{primitives::Address, providers::Provider};
@@ -14,18 +14,18 @@ use uni_v4_structure::BaselinePoolState;
 
 use super::{
     baseline_pool_factory::{BaselinePoolFactory, BaselinePoolFactoryError, UpdateMessage},
-    fetch_pool_keys::set_controller_address
+    fetch_pool_keys::set_controller_address,
 };
 use crate::{pool_providers::PoolEventStream, slot0::Slot0Stream};
 
 /// Pool information combining BaselinePoolState with token metadata
 #[derive(Debug, Clone)]
 pub struct PoolInfo {
-    pub baseline_state:  BaselinePoolState,
-    pub token0:          Address,
-    pub token1:          Address,
+    pub baseline_state: BaselinePoolState,
+    pub token0: Address,
+    pub token1: Address,
     pub token0_decimals: u8,
-    pub token1_decimals: u8
+    pub token1_decimals: u8,
 }
 
 #[derive(Error, Debug)]
@@ -37,7 +37,7 @@ pub enum PoolManagerServiceError {
     #[error("Pool factory error: {0}")]
     PoolFactory(String),
     #[error("Baseline pool factory error: {0}")]
-    BaselineFactory(#[from] BaselinePoolFactoryError)
+    BaselineFactory(#[from] BaselinePoolFactoryError),
 }
 
 /// Service for managing Uniswap V4 pools with real-time block subscription
@@ -45,19 +45,19 @@ pub enum PoolManagerServiceError {
 pub struct PoolManagerService<P, Event, S = ()>
 where
     P: Provider + Unpin + Clone + 'static,
-    Event: PoolEventStream
+    Event: PoolEventStream,
 {
-    pub(crate) factory:            BaselinePoolFactory<P>,
-    pub(crate) event_stream:       Event,
-    pub(crate) pools:              UniswapPools,
-    pub(crate) current_block:      u64,
+    pub(crate) factory: BaselinePoolFactory<P>,
+    pub(crate) event_stream: Event,
+    pub(crate) pools: UniswapPools,
+    pub(crate) current_block: u64,
     pub(crate) auto_pool_creation: bool,
-    pub(crate) slot0_stream:       Option<S>,
+    pub(crate) slot0_stream: Option<S>,
     // If we are loading more ticks at a block, we will queue up updates messages here
     // so that we don't hit any race conditions.
-    pending_updates:               Vec<PoolUpdate>,
+    pending_updates: Vec<PoolUpdate>,
     // Channel for sending updates instead of applying them directly
-    update_sender:                 Option<mpsc::Sender<PoolUpdate>>
+    update_sender: Option<mpsc::Sender<PoolUpdate>>,
 }
 
 impl<P, Event, S> PoolManagerService<P, Event, S>
@@ -65,7 +65,7 @@ where
     P: Provider + Clone + Unpin + 'static,
     Event: PoolEventStream,
     BaselinePoolFactory<P>: Stream<Item = UpdateMessage> + Unpin,
-    S: Slot0Stream
+    S: Slot0Stream,
 {
     /// Create a new PoolManagerService
     #[allow(clippy::too_many_arguments)]
@@ -83,7 +83,7 @@ where
         slot0_stream: Option<S>,
         current_block: Option<u64>,
         ticks_per_batch: Option<usize>,
-        update_channel: Option<mpsc::Sender<PoolUpdate>>
+        update_channel: Option<mpsc::Sender<PoolUpdate>>,
     ) -> Result<Self, PoolManagerServiceError> {
         // Set the controller address for the fetch_pool_keys module
         set_controller_address(controller_address);
@@ -105,7 +105,7 @@ where
             tick_band,
             tick_edge_threshold,
             filter_pool_keys,
-            ticks_per_batch
+            ticks_per_batch,
         )
         .await;
 
@@ -117,7 +117,7 @@ where
             auto_pool_creation,
             slot0_stream,
             pending_updates: Vec::new(),
-            update_sender: update_channel
+            update_sender: update_channel,
         };
 
         service
@@ -144,7 +144,7 @@ where
                 .iter()
                 .map(|entry| PoolUpdate::NewPoolState {
                     pool_id: *entry.key(),
-                    state:   entry.value().clone()
+                    state: entry.value().clone(),
                 })
                 .collect();
 
@@ -178,14 +178,14 @@ where
         block_number: u64,
         bundle_fee: u32,
         swap_fee: u32,
-        protocol_fee: u32
+        protocol_fee: u32,
     ) {
         self.factory.queue_pool_creation(
             pool_key,
             block_number,
             bundle_fee,
             swap_fee,
-            protocol_fee
+            protocol_fee,
         );
     }
 
@@ -243,7 +243,7 @@ where
                 swap_fee,
                 protocol_fee,
                 tick_spacing,
-                block
+                block,
             } => {
                 if self.auto_pool_creation {
                     // Reconstruct pool_key from the NewPool data
@@ -254,7 +254,7 @@ where
                             *block,
                             *bundle_fee,
                             *swap_fee,
-                            *protocol_fee
+                            *protocol_fee,
                         );
 
                         tracing::info!(
@@ -274,6 +274,13 @@ where
                         "Ignoring pool configured event (auto creation disabled): {:?}",
                         pool_id
                     );
+                }
+
+                if let Some(slot0_stream) = &mut self.slot0_stream
+                    && let Some(angstrom_pool_id) =
+                        self.factory.registry().public_key_from_private(pool_id)
+                {
+                    slot0_stream.subscribe_pools(HashSet::from([angstrom_pool_id]));
                 }
             }
             PoolUpdate::PoolRemoved { pool_id, .. } => {
@@ -339,7 +346,7 @@ where
     P: Provider + Clone + Unpin + 'static,
     Event: PoolEventStream,
     BaselinePoolFactory<P>: Stream<Item = UpdateMessage> + Unpin,
-    S: Slot0Stream
+    S: Slot0Stream,
 {
     type Output = ();
 
@@ -386,7 +393,7 @@ where
                     this.factory.check_and_request_ticks_if_needed(
                         *entry.key(),
                         entry.value(),
-                        Some(this.current_block)
+                        Some(this.current_block),
                     );
                 }
             }
@@ -415,7 +422,7 @@ where
                         this.factory.check_and_request_ticks_if_needed(
                             *entry.key(),
                             entry.value(),
-                            Some(this.current_block)
+                            Some(this.current_block),
                         );
                     }
                 }
@@ -427,8 +434,11 @@ where
         if let Some(slot0_stream) = this.slot0_stream.as_mut() {
             let mut slot0_updates = Vec::new();
             while let Poll::Ready(Some(update)) = slot0_stream.poll_next_unpin(cx) {
+                tracing::error!("got slot0 update");
                 slot0_updates.push(update);
             }
+
+            tracing::error!("LENGTH WHEN DISPATCHING: {}", slot0_updates.len());
             for update in slot0_updates {
                 let pool_update = PoolUpdate::Slot0Update(update);
                 this.dispatch_update(pool_update);
