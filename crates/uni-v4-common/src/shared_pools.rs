@@ -1,6 +1,6 @@
 use std::{
     ops::Deref,
-    sync::{Arc, atomic::AtomicU64},
+    sync::{Arc, atomic::AtomicU64}
 };
 
 use alloy_primitives::{B256, FixedBytes};
@@ -8,24 +8,24 @@ use dashmap::{DashMap, mapref::one::Ref};
 use thiserror::Error;
 use tokio::sync::{
     Notify,
-    futures::{Notified, OwnedNotified},
+    futures::{Notified, OwnedNotified}
 };
 use uni_v4_structure::BaselinePoolState;
 use uniswap_v3_math::error::UniswapV3MathError;
 
 use crate::{
     traits::{PoolUpdateDelivery, PoolUpdateDeliveryExt},
-    updates::PoolUpdate,
+    updates::PoolUpdate
 };
 
 #[derive(Clone)]
 pub struct UniswapPools {
-    pools: Arc<DashMap<PoolId, BaselinePoolState>>,
+    pools:        Arc<DashMap<PoolId, BaselinePoolState>>,
     // what block these are up to date for.
     block_number: Arc<AtomicU64>,
     // When the manager for the pools pushes a new block. It will notify all people who are
     // waiting.
-    notifier: Arc<Notify>,
+    notifier:     Arc<Notify>
 }
 
 impl Deref for UniswapPools {
@@ -41,7 +41,7 @@ impl UniswapPools {
         Self {
             pools,
             block_number: Arc::new(AtomicU64::from(block_number)),
-            notifier: Arc::new(Notify::new()),
+            notifier: Arc::new(Notify::new())
         }
     }
 
@@ -104,7 +104,7 @@ impl UniswapPools {
                     state.update_liquidity(
                         event.tick_lower,
                         event.tick_upper,
-                        event.liquidity_delta,
+                        event.liquidity_delta
                     );
                 }
                 PoolUpdate::FeeUpdate { pool_id, bundle_fee, swap_fee, protocol_fee, .. } => {
@@ -155,7 +155,7 @@ impl UniswapPools {
                     pool.value_mut().update_slot0(
                         update.tick,
                         update.sqrt_price_x96.into(),
-                        update.liquidity,
+                        update.liquidity
                     );
                 }
                 _ => {}
@@ -210,7 +210,7 @@ pub enum SwapSimulationError {
     #[error("Invalid sqrt price limit")]
     InvalidSqrtPriceLimit,
     #[error("Amount specified must be non-zero")]
-    ZeroAmountSpecified,
+    ZeroAmountSpecified
 }
 
 #[derive(Error, Debug)]
@@ -230,5 +230,5 @@ pub enum PoolError {
     #[error(transparent)]
     AlloySolTypeError(#[from] alloy::sol_types::Error),
     #[error(transparent)]
-    Eyre(#[from] eyre::Error),
+    Eyre(#[from] eyre::Error)
 }
