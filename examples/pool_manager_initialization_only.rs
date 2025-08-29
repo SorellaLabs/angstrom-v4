@@ -127,7 +127,8 @@ async fn main() -> Result<()> {
                 }
                 PoolUpdate::FeeUpdate { pool_id, bundle_fee, swap_fee, protocol_fee, .. } => {
                     println!(
-                        "💰 Received FeeUpdate for pool {pool_id:?} - bundle: {bundle_fee}, swap: {swap_fee}, protocol: {protocol_fee}"
+                        "💰 Received FeeUpdate for pool {pool_id:?} - bundle: {bundle_fee}, swap: \
+                         {swap_fee}, protocol: {protocol_fee}"
                     );
                 }
                 PoolUpdate::PoolRemoved { pool_id, .. } => {

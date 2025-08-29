@@ -144,7 +144,7 @@ impl UniswapPools {
                     self.pools.insert(pool_id, state);
                 }
                 PoolUpdate::Slot0Update(update) => {
-                    if update.current_block != update.current_block {
+                    if update.current_block != self.block_number {
                         continue;
                     }
 
