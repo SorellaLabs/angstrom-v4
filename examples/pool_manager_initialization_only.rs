@@ -123,23 +123,22 @@ async fn main() -> Result<()> {
             // Log the message type
             match msg {
                 PoolUpdate::NewBlock(block) => {
-                    println!("📦 Block #{}: Received NewBlock", block);
+                    println!("📦 Block #{block}: Received NewBlock");
                 }
                 PoolUpdate::FeeUpdate { pool_id, bundle_fee, swap_fee, protocol_fee, .. } => {
                     println!(
-                        "💰 Received FeeUpdate for pool {:?} - bundle: {}, swap: {}, protocol: {}",
-                        pool_id, bundle_fee, swap_fee, protocol_fee
+                        "💰 Received FeeUpdate for pool {pool_id:?} - bundle: {bundle_fee}, swap: {swap_fee}, protocol: {protocol_fee}"
                     );
                 }
                 PoolUpdate::PoolRemoved { pool_id, .. } => {
-                    println!("🗑️  Received PoolRemoved for pool {:?}", pool_id);
+                    println!("🗑️  Received PoolRemoved for pool {pool_id:?}");
                 }
                 PoolUpdate::UpdatedSlot0 { pool_id, .. } => {
-                    println!("📊 Received UpdatedSlot0 for pool {:?}", pool_id);
+                    println!("📊 Received UpdatedSlot0 for pool {pool_id:?}");
                 }
                 PoolUpdate::NewPoolState { pool_id, state } => {
                     local_pools.insert(pool_id, state);
-                    println!("🏊 Received NewPoolState for pool {:?}", pool_id);
+                    println!("🏊 Received NewPoolState for pool {pool_id:?}");
                 }
                 PoolUpdate::SwapEvent { .. } => {
                     // This shouldn't happen in InitializationOnly mode
@@ -166,12 +165,12 @@ async fn main() -> Result<()> {
                     local_pools.len()
                 );
                 if filtered_count > 0 {
-                    println!("   ⚠️  {} unexpected events received", filtered_count);
+                    println!("   ⚠️  {filtered_count} unexpected events received");
                 }
             }
         }
 
-        println!("Channel closed after {} messages", message_count);
+        println!("Channel closed after {message_count} messages");
     });
 
     // Main loop - just wait and print status
