@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use alloy::{
     eips::BlockNumberOrTag,
     primitives::address,
-    providers::{Provider, ProviderBuilder, WsConnect},
+    providers::{Provider, ProviderBuilder, WsConnect}
 };
 use eyre::Result;
 use futures::StreamExt;
@@ -13,8 +13,8 @@ use uni_v4_upkeeper::{
     pool_manager_service_builder::{NoOpSlot0Stream, PoolManagerServiceBuilder},
     pool_providers::{
         completed_block_stream::CompletedBlockStream,
-        pool_update_provider::{PoolUpdateProvider, StateStream},
-    },
+        pool_update_provider::{PoolUpdateProvider, StateStream}
+    }
 };
 
 #[tokio::main]
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
         pool_manager_address,
         controller_address,
         angstrom_address,
-        Default::default(),
+        Default::default()
     )
     .await
     .with_stream_mode(stream_mode);
@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
         controller_address,
         pool_manager_address,
         deploy_block,
-        event_stream,
+        event_stream
     )
     .with_initial_tick_range_size(300)
     .with_tick_edge_threshold(100)
