@@ -1,6 +1,9 @@
 use std::{
     ops::Deref,
-    sync::{Arc, atomic::AtomicU64}
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering}
+    }
 };
 
 use alloy_primitives::{B256, FixedBytes};
@@ -71,7 +74,7 @@ impl UniswapPools {
 
     pub fn update_pools(&self, mut updates: Vec<PoolUpdate>) {
         if updates.is_empty() {
-            return
+            return;
         }
 
         let mut new_block_number = None;
@@ -144,8 +147,8 @@ impl UniswapPools {
                     self.pools.insert(pool_id, state);
                 }
                 PoolUpdate::Slot0Update(update) => {
-                    if update.current_block != update.current_block {
-                        continue
+                    if update.current_block != self.block_number.load(Ordering::Acquire) {
+                        continue;
                     }
 
                     let Some(mut pool) = self.pools.get_mut(&update.angstrom_pool_id) else {

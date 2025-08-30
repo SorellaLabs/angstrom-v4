@@ -275,6 +275,13 @@ where
                         pool_id
                     );
                 }
+
+                if let Some(slot0_stream) = &mut self.slot0_stream
+                    && let Some(angstrom_pool_id) =
+                        self.factory.registry().public_key_from_private(pool_id)
+                {
+                    slot0_stream.subscribe_pools(HashSet::from([angstrom_pool_id]));
+                }
             }
             PoolUpdate::PoolRemoved { pool_id, .. } => {
                 tracing::info!("Pool removed: {:?}", pool_id);
@@ -427,8 +434,11 @@ where
         if let Some(slot0_stream) = this.slot0_stream.as_mut() {
             let mut slot0_updates = Vec::new();
             while let Poll::Ready(Some(update)) = slot0_stream.poll_next_unpin(cx) {
+                tracing::error!("got slot0 update");
                 slot0_updates.push(update);
             }
+
+            tracing::error!("LENGTH WHEN DISPATCHING: {}", slot0_updates.len());
             for update in slot0_updates {
                 let pool_update = PoolUpdate::Slot0Update(update);
                 this.dispatch_update(pool_update);
