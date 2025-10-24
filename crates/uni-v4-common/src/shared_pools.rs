@@ -1,6 +1,6 @@
 use std::{
     ops::Deref,
-    sync::{Arc, atomic::AtomicU64}
+    sync::{Arc, atomic::AtomicU64},
 };
 
 use alloy_primitives::{B256, FixedBytes};
@@ -8,24 +8,25 @@ use dashmap::{DashMap, mapref::one::Ref};
 use thiserror::Error;
 use tokio::sync::{
     Notify,
-    futures::{Notified, OwnedNotified}
+    futures::{Notified, OwnedNotified},
 };
 use uni_v4_structure::BaselinePoolState;
 use uniswap_v3_math::error::UniswapV3MathError;
 
 use crate::{
     traits::{PoolUpdateDelivery, PoolUpdateDeliveryExt},
-    updates::PoolUpdate
+    updates::PoolUpdate,
 };
 
 #[derive(Clone)]
 pub struct UniswapPools {
-    pools:        Arc<DashMap<PoolId, BaselinePoolState>>,
+    pools: Arc<DashMap<PoolId, BaselinePoolState>>,
+    slot0_notifiers: Arc<DashMap<PoolId, Arc<Notify>>>,
     // what block these are up to date for.
     block_number: Arc<AtomicU64>,
     // When the manager for the pools pushes a new block. It will notify all people who are
     // waiting.
-    notifier:     Arc<Notify>
+    notifier: Arc<Notify>,
 }
 
 impl Deref for UniswapPools {
@@ -39,9 +40,15 @@ impl Deref for UniswapPools {
 impl UniswapPools {
     pub fn new(pools: Arc<DashMap<PoolId, BaselinePoolState>>, block_number: u64) -> Self {
         Self {
+            slot0_notifiers: Arc::new(
+                pools
+                    .iter()
+                    .map(|pool| (*pool.key(), Arc::new(Notify::new())))
+                    .collect(),
+            ),
             pools,
             block_number: Arc::new(AtomicU64::from(block_number)),
-            notifier: Arc::new(Notify::new())
+            notifier: Arc::new(Notify::new()),
         }
     }
 
@@ -51,6 +58,14 @@ impl UniswapPools {
 
     pub async fn wait_for_next_update(&self) {
         self.notifier.notified().await;
+    }
+
+    pub async fn wait_for_next_slot0_update(&self, pool_id: PoolId) {
+        self.slot0_notifiers.get(&pool_id).unwrap().notified().await;
+    }
+
+    pub async fn notify_slot0_waiters(&self, pool_id: PoolId) {
+        self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
     }
 
     pub fn get_pool(&self, pool_id: &PoolId) -> Option<Ref<'_, PoolId, BaselinePoolState>> {
@@ -69,9 +84,17 @@ impl UniswapPools {
         self.notifier.clone().notified_owned()
     }
 
+    pub async fn next_slot0_update_future_owned(&self, pool_id: PoolId) -> OwnedNotified {
+        self.slot0_notifiers
+            .get(&pool_id)
+            .unwrap()
+            .clone()
+            .notified_owned()
+    }
+
     pub fn update_pools(&self, mut updates: Vec<PoolUpdate>) {
         if updates.is_empty() {
-            return
+            return;
         }
 
         let mut new_block_number = None;
@@ -104,7 +127,7 @@ impl UniswapPools {
                     state.update_liquidity(
                         event.tick_lower,
                         event.tick_upper,
-                        event.liquidity_delta
+                        event.liquidity_delta,
                     );
                 }
                 PoolUpdate::FeeUpdate { pool_id, bundle_fee, swap_fee, protocol_fee, .. } => {
@@ -124,6 +147,8 @@ impl UniswapPools {
 
                     let state = pool.value_mut();
                     state.update_slot0(data.tick, data.sqrt_price_x96.into(), data.liquidity);
+
+                    self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
                 }
                 PoolUpdate::NewTicks { pool_id, ticks, tick_bitmap } => {
                     let Some(mut pool) = self.pools.get_mut(&pool_id) else {
@@ -142,10 +167,12 @@ impl UniswapPools {
                 }
                 PoolUpdate::NewPoolState { pool_id, state } => {
                     self.pools.insert(pool_id, state);
+                    self.slot0_notifiers
+                        .insert(pool_id, Arc::new(Notify::new()));
                 }
                 PoolUpdate::Slot0Update(update) => {
                     if update.current_block != update.current_block {
-                        continue
+                        continue;
                     }
 
                     let Some(mut pool) = self.pools.get_mut(&update.angstrom_pool_id) else {
@@ -155,8 +182,13 @@ impl UniswapPools {
                     pool.value_mut().update_slot0(
                         update.tick,
                         update.sqrt_price_x96.into(),
-                        update.liquidity
+                        update.liquidity,
                     );
+
+                    self.slot0_notifiers
+                        .get(&update.angstrom_pool_id)
+                        .unwrap()
+                        .notify_waiters();
                 }
                 _ => {}
             }
@@ -210,7 +242,7 @@ pub enum SwapSimulationError {
     #[error("Invalid sqrt price limit")]
     InvalidSqrtPriceLimit,
     #[error("Amount specified must be non-zero")]
-    ZeroAmountSpecified
+    ZeroAmountSpecified,
 }
 
 #[derive(Error, Debug)]
@@ -230,5 +262,5 @@ pub enum PoolError {
     #[error(transparent)]
     AlloySolTypeError(#[from] alloy::sol_types::Error),
     #[error(transparent)]
-    Eyre(#[from] eyre::Error)
+    Eyre(#[from] eyre::Error),
 }

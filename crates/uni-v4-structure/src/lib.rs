@@ -7,9 +7,9 @@ use sqrt_pricex96::SqrtPriceX96;
 /// Fee configuration for different pool modes
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FeeConfiguration {
-    pub bundle_fee:   u32, // Stored fee for bundle mode
-    pub swap_fee:     u32, // Applied during swaps in unlocked mode
-    pub protocol_fee: u32  // Applied after swaps in unlocked mode (basis points in 1e6)
+    pub bundle_fee: u32,   // Stored fee for bundle mode
+    pub swap_fee: u32,     // Applied during swaps in unlocked mode
+    pub protocol_fee: u32, // Applied after swaps in unlocked mode (basis points in 1e6)
 }
 
 pub mod liquidity_base;
@@ -18,15 +18,16 @@ pub mod ray;
 pub mod sqrt_pricex96;
 pub mod tick_info;
 
+//
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaselinePoolState {
-    liquidity:           BaselineLiquidity,
-    block:               u64,
-    fee_config:          FeeConfiguration,
-    pub token0:          Address,
-    pub token1:          Address,
+    liquidity: BaselineLiquidity,
+    block: u64,
+    fee_config: FeeConfiguration,
+    pub token0: Address,
+    pub token1: Address,
     pub token0_decimals: u8,
-    pub token1_decimals: u8
+    pub token1_decimals: u8,
 }
 
 impl BaselinePoolState {
@@ -37,7 +38,7 @@ impl BaselinePoolState {
         token0: Address,
         token1: Address,
         token0_decimals: u8,
-        token1_decimals: u8
+        token1_decimals: u8,
     ) -> Self {
         Self { liquidity, block, fee_config, token1, token0, token0_decimals, token1_decimals }
     }
@@ -46,7 +47,7 @@ impl BaselinePoolState {
         &mut self,
         start_tick: i32,
         start_sqrt_price: SqrtPriceX96,
-        start_liquidity: u128
+        start_liquidity: u128,
     ) {
         self.liquidity.start_tick = start_tick;
         self.liquidity.start_sqrt_price = start_sqrt_price;
@@ -108,16 +109,16 @@ impl BaselinePoolState {
 
     pub fn noop(&self) -> PoolSwapResult<'_> {
         PoolSwapResult {
-            fee_config:    self.fee_config.clone(),
-            start_price:   self.liquidity.start_sqrt_price,
-            start_tick:    self.liquidity.start_tick,
-            end_price:     self.liquidity.start_sqrt_price,
-            end_tick:      self.liquidity.start_tick,
-            total_d_t0:    0,
-            total_d_t1:    0,
-            steps:         vec![],
+            fee_config: self.fee_config.clone(),
+            start_price: self.liquidity.start_sqrt_price,
+            start_tick: self.liquidity.start_tick,
+            end_price: self.liquidity.start_sqrt_price,
+            end_tick: self.liquidity.start_tick,
+            total_d_t0: 0,
+            total_d_t1: 0,
+            steps: vec![],
             end_liquidity: self.liquidity.current(),
-            is_bundle:     true
+            is_bundle: true,
         }
     }
 
@@ -125,7 +126,7 @@ impl BaselinePoolState {
         &self,
         amount: I256,
         direction: bool,
-        is_bundle: bool
+        is_bundle: bool,
     ) -> eyre::Result<PoolSwapResult<'_>> {
         let liq = self.liquidity.current();
 
@@ -135,7 +136,7 @@ impl BaselinePoolState {
             target_price: None,
             direction,
             fee_config: self.fee_config.clone(),
-            is_bundle
+            is_bundle,
         }
         .swap()
     }
@@ -146,7 +147,7 @@ impl BaselinePoolState {
     pub fn swap_current_to_price(
         &self,
         price_limit: SqrtPriceX96,
-        is_bundle: bool
+        is_bundle: bool,
     ) -> eyre::Result<PoolSwapResult<'_>> {
         let liq = self.liquidity.current();
         let direction = liq.current_sqrt_price >= price_limit;
@@ -157,7 +158,7 @@ impl BaselinePoolState {
             target_price: Some(price_limit),
             direction,
             fee_config: self.fee_config.clone(),
-            is_bundle
+            is_bundle,
         }
         .swap()?;
 
@@ -172,7 +173,7 @@ impl BaselinePoolState {
     pub fn swap_current_to_price_raw(
         &self,
         price_limit: SqrtPriceX96,
-        is_bundle: bool
+        is_bundle: bool,
     ) -> eyre::Result<PoolSwapResult<'_>> {
         let liq = self.liquidity.current();
 
@@ -184,7 +185,7 @@ impl BaselinePoolState {
             target_price: Some(price_limit),
             direction,
             fee_config: self.fee_config.clone(),
-            is_bundle
+            is_bundle,
         }
         .swap()
     }
