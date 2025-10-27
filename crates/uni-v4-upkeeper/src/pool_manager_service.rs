@@ -171,6 +171,11 @@ where
         self.factory.current_pool_keys()
     }
 
+    /// Gives a reference to the optional slot0 stream
+    pub fn slot0_stream_ref(&self) -> Option<&S> {
+        self.slot0_stream.as_ref()
+    }
+
     /// Handle a new pool creation
     fn handle_new_pool(
         &mut self,
