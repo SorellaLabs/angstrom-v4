@@ -39,7 +39,7 @@ uni-v4-structure = { path = "crates/uni-v4-structure" }
 uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper" }
 
 # External dependencies
-alloy = { version = "1.0.13", features = [
+alloy = { version = "1.0.41", features = [
   "rlp",
   "full",
   "node-bindings",
@@ -50,7 +50,7 @@ alloy = { version = "1.0.13", features = [
   "sol-types",
   "contract",
 ] }
-alloy-primitives = { version = "1.2.0", default-features = false, features = [
+alloy-primitives = { version = "1.4.1", default-features = false, features = [
   "map-foldhash",
   "rand",
 ] }
