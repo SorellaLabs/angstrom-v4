@@ -1,14 +1,12 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use alloy::{
+    network::Ethereum,
     primitives::{I256, address},
-    providers::{Provider, ProviderBuilder}
+    providers::ProviderBuilder
 };
 use alloy_primitives::U256;
-use uni_v4_structure::sqrt_pricex96::SqrtPriceX96;
-use uni_v4_upkeeper::{
-    pool_manager_service_builder::PoolManagerServiceBuilder, slot0::NoOpSlot0Stream
-};
+use uni_v4_upkeeper::pool_manager_service_builder::PoolManagerServiceBuilder;
 
 // Test configuration - Uses ETH_URL environment variable
 fn get_eth_url() -> Option<String> {
@@ -37,7 +35,7 @@ async fn test_specific_pool_at_block() {
 
     // Create real provider
     let provider = Arc::new(
-        ProviderBuilder::default()
+        ProviderBuilder::<_, _, Ethereum>::default()
             .with_recommended_fillers()
             .connect(&eth_url)
             .await

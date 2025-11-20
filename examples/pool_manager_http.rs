@@ -76,7 +76,7 @@ async fn main() -> eyre::Result<()> {
         CompletedBlockStream::new(prev_block_hash, block, provider.clone(), block_stream);
     let event_stream = StateStream::new(update_provider, block_stream);
     // Build service with event stream but without slot0 stream
-    let service = PoolManagerServiceBuilder::<_, _, NoOpSlot0Stream>::new(
+    let service = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
         angstrom_address,
         controller_address,

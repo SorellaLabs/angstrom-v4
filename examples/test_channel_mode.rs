@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alloy::{primitives::address, providers::ProviderBuilder};
+use alloy::{network::Ethereum, primitives::address, providers::ProviderBuilder};
 use eyre::Result;
 use tokio::sync::mpsc;
 use uni_v4_common::PoolUpdate;
@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
     println!("🧪 Testing channel mode functionality...");
 
     // Create a mock provider
-    let provider = Arc::new(ProviderBuilder::default().connect_anvil());
+    let provider = Arc::new(ProviderBuilder::<_, _, Ethereum>::default().connect_anvil());
 
     // Test addresses
     let pool_manager_address = address!("0000000000000000000000000000000000000001");
@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     // Build service with channel mode
     println!("🔧 Building pool manager service with channel mode...");
-    let service = PoolManagerServiceBuilder::<_, NoOpEventStream, NoOpSlot0Stream>::new(
+    let service = PoolManagerServiceBuilder::<_, _, NoOpEventStream, NoOpSlot0Stream>::new(
         provider.clone(),
         angstrom_address,
         controller_address,

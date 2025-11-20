@@ -87,7 +87,7 @@ async fn main() -> eyre::Result<()> {
 
     // Create pool manager service with both event stream and slot0 stream
     println!("🔨 Building pool manager service with slot0 stream...");
-    let service = PoolManagerServiceBuilder::<_, _, NoOpSlot0Stream>::new(
+    let service = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
         angstrom_address,
         controller_address,

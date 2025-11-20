@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
 
     // Build service with channel mode
     println!("🔧 Building pool manager service with channel mode...");
-    let service = PoolManagerServiceBuilder::<_, _, NoOpSlot0Stream>::new(
+    let service = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
         angstrom_address,
         controller_address,
@@ -103,8 +103,8 @@ async fn main() -> Result<()> {
     tokio::spawn(service);
 
     // Spawn a task to receive and process updates
-    let update_processor = tokio::spawn(async move {
-        let mut local_pools = initial_pools;
+    let _update_processor = tokio::spawn(async move {
+        let local_pools = initial_pools;
         let mut message_count = 0;
 
         println!("📨 Starting message receiver...");
