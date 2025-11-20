@@ -97,6 +97,8 @@ impl UniswapPools {
             return;
         }
 
+        let current_block_number = self.block_number.load(std::sync::atomic::Ordering::Relaxed);
+
         let mut new_block_number = None;
         // we sort ascending
         updates.sort_by(|a, b| a.sort(b));
@@ -171,7 +173,7 @@ impl UniswapPools {
                         .insert(pool_id, Arc::new(Notify::new()));
                 }
                 PoolUpdate::Slot0Update(update) => {
-                    if update.current_block != update.current_block {
+                    if update.current_block != current_block_number {
                         continue;
                     }
 

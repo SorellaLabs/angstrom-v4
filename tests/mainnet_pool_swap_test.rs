@@ -42,7 +42,7 @@ async fn test_specific_pool_at_block() {
             .unwrap()
     );
 
-    println!("Loading pools at block {} to find available pools", deploy_block);
+    println!("Loading pools at block {deploy_block} to find available pools");
 
     // Load pools to see what's available
     let service = PoolManagerServiceBuilder::new_with_noop_stream(
@@ -65,7 +65,7 @@ async fn test_specific_pool_at_block() {
     // List all pools with their details
     for (idx, entry) in pools.get_pools().iter().enumerate() {
         let (pool_id, pool_state) = entry.pair();
-        println!("\n[Pool {}] ID: {:?}", idx, pool_id);
+        println!("\n[Pool {idx}] ID: {pool_id:?}");
         println!("block {}", pool_state.block_number());
         println!("  Token0: {:?} (decimals: {})", pool_state.token0, pool_state.token0_decimals);
         println!("  Token1: {:?} (decimals: {})", pool_state.token1, pool_state.token1_decimals);
@@ -83,7 +83,7 @@ async fn test_specific_pool_at_block() {
                     println!("    ✓ Swap successful - t0 out: {}", result.total_d_t0);
                 }
                 Err(e) => {
-                    println!("    ✗ Swap failed: {}", e);
+                    println!("    ✗ Swap failed: {e}");
                 }
             }
         }
