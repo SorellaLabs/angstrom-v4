@@ -140,7 +140,7 @@ async fn test_pool_state_consistency() {
 
     let state_stream = StateStream::new(update_provider, block_stream);
     // Use the builder to create service with all discovered pools
-    let mut service1 = PoolManagerServiceBuilder::<_, _, NoOpSlot0Stream>::new(
+    let mut service1 = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
         angstrom_address,
         controller_address,

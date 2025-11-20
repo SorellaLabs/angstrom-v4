@@ -1,9 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
+    marker::PhantomData,
     sync::Arc
 };
 
 use alloy::{
+    network::Network,
     primitives::{
         Address, U256,
         aliases::{I24, U24}
@@ -38,7 +40,7 @@ pub enum UpdateMessage {
 }
 
 /// Factory for creating BaselinePoolState instances with full tick loading
-pub struct BaselinePoolFactory<P> {
+pub struct BaselinePoolFactory<P, N> {
     provider:            Arc<P>,
     registry:            UniswapPoolRegistry,
     pool_manager:        Address,
@@ -50,11 +52,14 @@ pub struct BaselinePoolFactory<P> {
     >,
     pool_generator: FuturesUnordered<
         BoxFuture<'static, Result<(PoolId, BaselinePoolState), BaselinePoolFactoryError>>
-    >
+    >,
+    _phantom:            PhantomData<N>
 }
 
-impl<P: Provider + 'static> BaselinePoolFactory<P>
+impl<P, N> BaselinePoolFactory<P, N>
 where
+    P: Provider<N> + 'static,
+    N: Network,
     DataLoader: PoolDataLoader
 {
     #[allow(clippy::too_many_arguments)]
@@ -92,7 +97,8 @@ where
             tick_edge_threshold: tick_edge_threshold.unwrap_or(100),
             ticks_per_batch: ticks_per_batch.unwrap_or(DEFAULT_TICKS_PER_BATCH),
             tick_loading: FuturesUnordered::default(),
-            pool_generator: FuturesUnordered::default()
+            pool_generator: FuturesUnordered::default(),
+            _phantom: PhantomData
         };
 
         let pools = DashMap::new();
@@ -881,7 +887,9 @@ where
     }
 }
 
-impl<P: Provider + Clone + Unpin + 'static> Stream for BaselinePoolFactory<P> {
+impl<P: Provider<N> + Clone + Unpin + 'static, N: Network + Unpin> Stream
+    for BaselinePoolFactory<P, N>
+{
     type Item = UpdateMessage;
 
     fn poll_next(

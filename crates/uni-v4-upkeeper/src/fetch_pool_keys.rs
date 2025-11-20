@@ -1,6 +1,7 @@
 use std::{collections::HashSet, sync::OnceLock};
 
 use alloy::{
+    network::Network,
     primitives::{Address, aliases::I24},
     providers::Provider,
     rpc::types::Filter,
@@ -48,7 +49,7 @@ pub fn set_controller_address(address: Address) {
     });
 }
 
-pub async fn fetch_angstrom_pools<P>(
+pub async fn fetch_angstrom_pools<P, N>(
     // the block angstrom was deployed at
     mut deploy_block: usize,
     end_block: usize,
@@ -56,7 +57,8 @@ pub async fn fetch_angstrom_pools<P>(
     db: &P
 ) -> Vec<PoolKeyWithFees>
 where
-    P: Provider
+    P: Provider<N>,
+    N: Network
 {
     let mut filters = vec![];
     let controller_address = *CONTROLLER_V1_ADDRESS

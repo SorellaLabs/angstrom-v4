@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     .await
     .with_stream_mode(stream_mode);
 
-    println!("   Using stream mode: {:?}", stream_mode);
+    println!("   Using stream mode: {stream_mode:?}");
 
     // Create block stream
     let latest_block = provider
@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
 
     // Build service with channel mode
     println!("🔧 Building pool manager service with channel mode...");
-    let service = PoolManagerServiceBuilder::<_, _, NoOpSlot0Stream>::new(
+    let service = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
         angstrom_address,
         controller_address,
@@ -103,8 +103,8 @@ async fn main() -> Result<()> {
     tokio::spawn(service);
 
     // Spawn a task to receive and process updates
-    let update_processor = tokio::spawn(async move {
-        let mut local_pools = initial_pools;
+    let _update_processor = tokio::spawn(async move {
+        let local_pools = initial_pools;
         let mut message_count = 0;
 
         println!("📨 Starting message receiver...");
@@ -115,22 +115,22 @@ async fn main() -> Result<()> {
             // Log the message type
             match &msg {
                 PoolUpdate::NewBlock(block) => {
-                    println!("📦 Block #{}: Received NewBlock", block);
+                    println!("📦 Block #{block}: Received NewBlock");
                 }
                 PoolUpdate::NewPool { pool_id, .. } => {
-                    println!("🏊 Received NewPool config for pool {:?}", pool_id);
+                    println!("🏊 Received NewPool config for pool {pool_id:?}");
                 }
                 PoolUpdate::SwapEvent { pool_id, .. } => {
-                    println!("💱 Received SwapEvent for pool {:?}", pool_id);
+                    println!("💱 Received SwapEvent for pool {pool_id:?}");
                 }
                 PoolUpdate::LiquidityEvent { pool_id, .. } => {
-                    println!("💧 Received LiquidityEvent for pool {:?}", pool_id);
+                    println!("💧 Received LiquidityEvent for pool {pool_id:?}");
                 }
                 PoolUpdate::NewTicks { pool_id, ticks, .. } => {
                     println!("📊 Received NewTicks for pool {:?} ({} ticks)", pool_id, ticks.len());
                 }
                 PoolUpdate::NewPoolState { pool_id, .. } => {
-                    println!("🆕 Received NewPoolState with state for pool {:?}", pool_id);
+                    println!("🆕 Received NewPoolState with state for pool {pool_id:?}");
                 }
                 PoolUpdate::Slot0Update(update) => {
                     println!("🔄 Received Slot0Update for pool {:?}", update.angstrom_pool_id);
@@ -153,7 +153,7 @@ async fn main() -> Result<()> {
             }
         }
 
-        println!("Channel closed after {} messages", message_count);
+        println!("Channel closed after {message_count} messages");
     });
 
     // Main loop - just wait and print status

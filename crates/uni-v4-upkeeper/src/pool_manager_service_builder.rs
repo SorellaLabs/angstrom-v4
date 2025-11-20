@@ -1,6 +1,10 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, marker::PhantomData, sync::Arc};
 
-use alloy::{primitives::Address, providers::Provider};
+use alloy::{
+    network::{Ethereum, Network},
+    primitives::Address,
+    providers::Provider
+};
 use futures::Stream;
 use tokio::sync::mpsc;
 use uni_v4_common::{PoolId, PoolKey, PoolUpdate};
@@ -14,9 +18,10 @@ use super::{
 use crate::pool_providers::PoolEventStream;
 
 /// Builder for creating a configured PoolManagerService
-pub struct PoolManagerServiceBuilder<P, Event, S = NoOpSlot0Stream>
+pub struct PoolManagerServiceBuilder<P, N, Event, S = NoOpSlot0Stream>
 where
-    P: Provider + Clone + 'static
+    P: Provider<N> + Clone + 'static,
+    N: Network
 {
     // Required fields
     provider:             Arc<P>,
@@ -36,12 +41,14 @@ where
     ticks_per_batch:            Option<usize>,
     reorg_detection_blocks:     Option<u64>,
     reorg_lookback_block_chunk: Option<u64>,
-    update_channel:             Option<mpsc::Sender<PoolUpdate>>
+    update_channel:             Option<mpsc::Sender<PoolUpdate>>,
+    _phantom:                   PhantomData<N>
 }
 
-impl<P, Event, Slot0> PoolManagerServiceBuilder<P, Event, Slot0>
+impl<P, N, Event, Slot0> PoolManagerServiceBuilder<P, N, Event, Slot0>
 where
-    P: Provider + Clone + 'static,
+    P: Provider<N> + Clone + 'static,
+    N: Network,
     Event: PoolEventStream
 {
     /// Create a new builder with required parameters including event stream
@@ -69,14 +76,47 @@ where
             ticks_per_batch: None,
             reorg_detection_blocks: None,
             reorg_lookback_block_chunk: None,
-            update_channel: None
+            update_channel: None,
+            _phantom: PhantomData
         }
     }
 }
 
-impl<P, Event, S> PoolManagerServiceBuilder<P, Event, S>
+impl<P, Event, S> PoolManagerServiceBuilder<P, Ethereum, Event, S>
 where
-    P: Provider + Clone + 'static + Unpin
+    P: Provider<Ethereum> + Clone + 'static + Unpin
+{
+    /// Set the slot0 update stream
+    pub fn with_slot0_stream<NewS: Slot0Stream + 'static>(
+        self,
+        stream: NewS
+    ) -> PoolManagerServiceBuilder<P, Ethereum, Event, NewS> {
+        PoolManagerServiceBuilder {
+            provider:                   self.provider,
+            angstrom_address:           self.angstrom_address,
+            controller_address:         self.controller_address,
+            pool_manager_address:       self.pool_manager_address,
+            deploy_block:               self.deploy_block,
+            event_stream:               self.event_stream,
+            initial_tick_range_size:    self.initial_tick_range_size,
+            tick_edge_threshold:        self.tick_edge_threshold,
+            fixed_pools:                self.fixed_pools,
+            auto_pool_creation:         self.auto_pool_creation,
+            slot0_stream:               Some(stream),
+            current_block:              self.current_block,
+            ticks_per_batch:            self.ticks_per_batch,
+            reorg_detection_blocks:     self.reorg_detection_blocks,
+            reorg_lookback_block_chunk: self.reorg_lookback_block_chunk,
+            update_channel:             self.update_channel,
+            _phantom:                   PhantomData
+        }
+    }
+}
+
+impl<P, N, Event, S> PoolManagerServiceBuilder<P, N, Event, S>
+where
+    P: Provider<N> + Clone + 'static + Unpin,
+    N: Network + Unpin
 {
     /// Set the initial tick range size for loading pool data
     pub fn with_initial_tick_range_size(mut self, size: u16) -> Self {
@@ -134,33 +174,8 @@ where
         self
     }
 
-    /// Set the slot0 update stream
-    pub fn with_slot0_stream<NewS: Slot0Stream + 'static>(
-        self,
-        stream: NewS
-    ) -> PoolManagerServiceBuilder<P, Event, NewS> {
-        PoolManagerServiceBuilder {
-            provider:                   self.provider,
-            angstrom_address:           self.angstrom_address,
-            controller_address:         self.controller_address,
-            pool_manager_address:       self.pool_manager_address,
-            deploy_block:               self.deploy_block,
-            event_stream:               self.event_stream,
-            initial_tick_range_size:    self.initial_tick_range_size,
-            tick_edge_threshold:        self.tick_edge_threshold,
-            fixed_pools:                self.fixed_pools,
-            auto_pool_creation:         self.auto_pool_creation,
-            slot0_stream:               Some(stream),
-            current_block:              self.current_block,
-            ticks_per_batch:            self.ticks_per_batch,
-            reorg_detection_blocks:     self.reorg_detection_blocks,
-            reorg_lookback_block_chunk: self.reorg_lookback_block_chunk,
-            update_channel:             self.update_channel
-        }
-    }
-
     /// Build the PoolManagerService with the configured options
-    pub async fn build(self) -> Result<PoolManagerService<P, Event, S>, PoolManagerServiceError>
+    pub async fn build(self) -> Result<PoolManagerService<P, N, Event, S>, PoolManagerServiceError>
     where
         Event: PoolEventStream,
         S: Slot0Stream + 'static,
@@ -193,9 +208,10 @@ where
 }
 
 // Helper method for creating a builder with no-op streams
-impl<P> PoolManagerServiceBuilder<P, NoOpEventStream, NoOpSlot0Stream>
+impl<P, N> PoolManagerServiceBuilder<P, N, NoOpEventStream, NoOpSlot0Stream>
 where
-    P: Provider + Clone + 'static + Unpin
+    P: Provider<N> + Clone + 'static + Unpin,
+    N: Network + Unpin
 {
     /// Create a new builder with no-op event stream and slot0 stream
     pub fn new_with_noop_stream(
@@ -205,7 +221,7 @@ where
         pool_manager_address: Address,
         deploy_block: u64
     ) -> Self {
-        let builder = PoolManagerServiceBuilder::<P, NoOpEventStream, NoOpSlot0Stream>::new(
+        let builder = PoolManagerServiceBuilder::<P, N, NoOpEventStream, NoOpSlot0Stream>::new(
             provider,
             angstrom_address,
             controller_address,
@@ -213,7 +229,26 @@ where
             deploy_block,
             NoOpEventStream
         );
-        builder.with_slot0_stream(NoOpSlot0Stream::default())
+
+        PoolManagerServiceBuilder {
+            provider:                   builder.provider,
+            angstrom_address:           builder.angstrom_address,
+            controller_address:         builder.controller_address,
+            pool_manager_address:       builder.pool_manager_address,
+            deploy_block:               builder.deploy_block,
+            event_stream:               builder.event_stream,
+            initial_tick_range_size:    builder.initial_tick_range_size,
+            tick_edge_threshold:        builder.tick_edge_threshold,
+            fixed_pools:                builder.fixed_pools,
+            auto_pool_creation:         builder.auto_pool_creation,
+            slot0_stream:               Some(NoOpSlot0Stream::default()),
+            current_block:              builder.current_block,
+            ticks_per_batch:            builder.ticks_per_batch,
+            reorg_detection_blocks:     builder.reorg_detection_blocks,
+            reorg_lookback_block_chunk: builder.reorg_lookback_block_chunk,
+            update_channel:             builder.update_channel,
+            _phantom:                   PhantomData
+        }
     }
 }
 

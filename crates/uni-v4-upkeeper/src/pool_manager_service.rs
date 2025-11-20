@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll}
 };
 
-use alloy::{primitives::Address, providers::Provider};
+use alloy::{network::Network, primitives::Address, providers::Provider};
 use futures::{Future, Stream, StreamExt};
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -42,12 +42,13 @@ pub enum PoolManagerServiceError {
 
 /// Service for managing Uniswap V4 pools with real-time block subscription
 /// updates
-pub struct PoolManagerService<P, Event, S = ()>
+pub struct PoolManagerService<P, N, Event, S = ()>
 where
-    P: Provider + Unpin + Clone + 'static,
+    P: Provider<N> + Unpin + Clone + 'static,
+    N: Network,
     Event: PoolEventStream
 {
-    pub(crate) factory:            BaselinePoolFactory<P>,
+    pub(crate) factory:            BaselinePoolFactory<P, N>,
     pub(crate) event_stream:       Event,
     pub(crate) pools:              UniswapPools,
     pub(crate) current_block:      u64,
@@ -60,11 +61,12 @@ where
     update_sender:                 Option<mpsc::Sender<PoolUpdate>>
 }
 
-impl<P, Event, S> PoolManagerService<P, Event, S>
+impl<P, N, Event, S> PoolManagerService<P, N, Event, S>
 where
-    P: Provider + Clone + Unpin + 'static,
+    P: Provider<N> + Clone + Unpin + 'static,
+    N: Network,
     Event: PoolEventStream,
-    BaselinePoolFactory<P>: Stream<Item = UpdateMessage> + Unpin,
+    BaselinePoolFactory<P, N>: Stream<Item = UpdateMessage> + Unpin,
     S: Slot0Stream
 {
     /// Create a new PoolManagerService
@@ -339,11 +341,12 @@ where
     }
 }
 
-impl<P, Event, S> Future for PoolManagerService<P, Event, S>
+impl<P, N, Event, S> Future for PoolManagerService<P, N, Event, S>
 where
-    P: Provider + Clone + Unpin + 'static,
+    P: Provider<N> + Clone + Unpin + 'static,
+    N: Network + Unpin,
     Event: PoolEventStream,
-    BaselinePoolFactory<P>: Stream<Item = UpdateMessage> + Unpin,
+    BaselinePoolFactory<P, N>: Stream<Item = UpdateMessage> + Unpin,
     S: Slot0Stream
 {
     type Output = ();
