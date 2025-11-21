@@ -85,7 +85,7 @@ fn main() {
             format!(
                 r#"#[rustfmt::skip]
 pub mod {mod_name} {{
-    alloy::sol!(
+    alloy_sol_types::sol!(
         #[allow(missing_docs)]
         #[sol(rpc)]
         #[derive(Debug, PartialEq, Eq,Hash, serde::Serialize, serde::Deserialize)]

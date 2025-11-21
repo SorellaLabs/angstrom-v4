@@ -11,7 +11,13 @@ uni-v4-common.workspace = true
 uni-v4-structure.workspace = true
 
 # External dependencies
-alloy.workspace = true
+alloy-eips.workspace = true
+alloy-network.workspace = true
+alloy-contract.workspace = true
+alloy-consensus.workspace = true
+alloy-provider.workspace = true
+alloy-rpc-types.workspace = true
+alloy-sol-types.workspace = true
 alloy-primitives.workspace = true
 jsonrpsee.workspace = true
 async-trait.workspace = true
@@ -26,4 +32,5 @@ uniswap_v3_math.workspace = true
 
 [build-dependencies]
 convert_case = "0"
+alloy-sol-types.workspace = true
 itertools.workspace = true

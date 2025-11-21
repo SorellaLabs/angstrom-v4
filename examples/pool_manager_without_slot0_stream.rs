@@ -1,9 +1,7 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
-use alloy::{
-    primitives::address,
-    providers::{Provider, ProviderBuilder}
-};
+use alloy_primitives::address;
+use alloy_provider::{Provider, ProviderBuilder};
 use futures::StreamExt;
 use uni_v4_common::PoolId;
 use uni_v4_upkeeper::{

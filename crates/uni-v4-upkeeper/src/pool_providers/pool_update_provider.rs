@@ -6,14 +6,12 @@ use std::{
     task::{Context, Poll}
 };
 
-use alloy::{
-    consensus::Transaction,
-    eips::BlockId,
-    primitives::{Address, U160, aliases::I24},
-    providers::Provider,
-    rpc::types::{Block, Filter},
-    sol_types::{SolCall, SolEvent}
-};
+use alloy_consensus::Transaction;
+use alloy_eips::BlockId;
+use alloy_primitives::{Address, U160, aliases::I24};
+use alloy_provider::Provider;
+use alloy_rpc_types::{Block, Filter};
+use alloy_sol_types::{SolCall, SolEvent};
 use futures::{FutureExt, StreamExt, stream::Stream};
 use thiserror::Error;
 use uni_v4_common::{
@@ -32,7 +30,7 @@ const DEFAULT_REORG_DETECTION_BLOCKS: u64 = 10;
 /// Default chunk size for block processing
 const DEFAULT_REORG_LOOKBACK_BLOCK_CHUNK: u64 = 100;
 
-alloy::sol! {
+alloy_sol_types::sol! {
     #[derive(Debug, PartialEq, Eq)]
     contract ControllerV1 {
 
@@ -112,7 +110,7 @@ where
         pool_registry: UniswapPoolRegistry
     ) -> Self {
         let current_block = provider
-            .get_block(BlockId::Number(alloy::eips::BlockNumberOrTag::Latest))
+            .get_block(BlockId::Number(alloy_eips::BlockNumberOrTag::Latest))
             .await
             .unwrap()
             .unwrap()
@@ -199,7 +197,7 @@ where
     /// Process a swap event log
     fn process_swap_event(
         &self,
-        log: &alloy::rpc::types::Log,
+        log: &alloy_rpc_types::Log,
         block_number: u64
     ) -> Option<PoolUpdate> {
         if let Ok(swap_event) = IUniswapV4Pool::Swap::decode_log(&log.inner) {
@@ -230,7 +228,7 @@ where
     /// Process a liquidity event log
     fn process_liquidity_event(
         &mut self,
-        log: &alloy::rpc::types::Log,
+        log: &alloy_rpc_types::Log,
         block_number: u64,
         store_in_history: bool
     ) -> Option<PoolUpdate> {
@@ -269,7 +267,7 @@ where
     }
 
     /// Process controller event logs
-    fn process_controller_logs(&mut self, logs: Vec<alloy::rpc::types::Log>) -> Vec<PoolUpdate> {
+    fn process_controller_logs(&mut self, logs: Vec<alloy_rpc_types::Log>) -> Vec<PoolUpdate> {
         let mut updates = Vec::new();
 
         for log in logs {
@@ -331,7 +329,7 @@ where
     /// Process batch update pools from transaction
     fn process_batch_update_pools(
         &self,
-        tx: &alloy::rpc::types::Transaction,
+        tx: &alloy_rpc_types::Transaction,
         block_number: u64
     ) -> Vec<PoolUpdate> {
         let mut updates = Vec::new();

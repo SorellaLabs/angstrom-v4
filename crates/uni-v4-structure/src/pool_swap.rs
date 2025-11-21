@@ -1,6 +1,6 @@
 use std::ops::Neg;
 
-use alloy::primitives::{I256, U256};
+use alloy_primitives::{I256, U256};
 // use itertools::Itertools;
 use uniswap_v3_math::tick_math::{MAX_SQRT_RATIO, MIN_SQRT_RATIO};
 

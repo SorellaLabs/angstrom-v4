@@ -163,7 +163,7 @@ pub enum SwapSimulationError {
 
 #[derive(Error, Debug)]
 pub enum PoolError {
-    #[error("Invalid signature: [{}]", .0.iter().map(|b| format!("0x{}", alloy::hex::encode(b))).collect::<Vec<_>>().join(", "))]
+    #[error("Invalid signature: [{}]", .0.iter().map(|b| format!("0x{}", alloy_primitives::hex::encode(b))).collect::<Vec<_>>().join(", "))]
     InvalidEventSignature(Vec<B256>),
     #[error("Swap simulation failed")]
     SwapSimulationFailed,
@@ -174,9 +174,9 @@ pub enum PoolError {
     #[error(transparent)]
     SwapSimulationError(#[from] SwapSimulationError),
     #[error(transparent)]
-    AlloyContractError(#[from] alloy::contract::Error),
+    AlloyContractError(#[from] alloy_contract::Error),
     #[error(transparent)]
-    AlloySolTypeError(#[from] alloy::sol_types::Error),
+    AlloySolTypeError(#[from] alloy_sol_types::Error),
     #[error(transparent)]
     Eyre(#[from] eyre::Error)
 }

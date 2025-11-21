@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use alloy::primitives::{Address, aliases::U24};
+use alloy_primitives::{Address, aliases::U24};
 use uni_v4_common::{PoolId, PoolKey};
 
 #[derive(Debug, Default, Clone)]

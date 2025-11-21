@@ -1,10 +1,8 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use alloy::{
-    eips::BlockNumberOrTag,
-    primitives::address,
-    providers::{Provider, ProviderBuilder, WsConnect}
-};
+use alloy_eips::BlockNumberOrTag;
+use alloy_primitives::address;
+use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use eyre::Result;
 use futures::StreamExt;
 use jsonrpsee::ws_client::WsClientBuilder;

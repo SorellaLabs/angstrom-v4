@@ -1,10 +1,8 @@
 use std::{collections::HashSet, marker::PhantomData, sync::Arc};
 
-use alloy::{
-    network::{Ethereum, Network},
-    primitives::Address,
-    providers::Provider
-};
+use alloy_network::{Ethereum, Network};
+use alloy_primitives::Address;
+use alloy_provider::Provider;
 use futures::Stream;
 use tokio::sync::mpsc;
 use uni_v4_common::{PoolId, PoolKey, PoolUpdate};

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use alloy::primitives::{U160, U256, Uint, aliases::U320};
+use alloy_primitives::{U160, U256, Uint, aliases::U320};
 use malachite::{
     Natural, Rational,
     num::{
@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use uniswap_v3_math::tick_math::{get_sqrt_ratio_at_tick, get_tick_at_sqrt_ratio};
 
 use super::ray::{Ray, const_1e27, const_2_192};
+use crate::ray;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SqrtPriceX96(U160);
@@ -37,7 +38,7 @@ impl SqrtPriceX96 {
 
     /// Produces the SqrtPriceX96 precisely at a given tick
     pub fn at_tick(tick: i32) -> eyre::Result<Self> {
-        Ok(Self::from(get_sqrt_ratio_at_tick(tick)?))
+        Ok(Self::from(ray::Ray(get_sqrt_ratio_at_tick(tick)?)))
     }
 
     /// Produces the maximum SqrtPriceX96 valid for a given tick before we step

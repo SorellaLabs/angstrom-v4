@@ -1,19 +1,17 @@
 use std::{collections::HashSet, sync::OnceLock};
 
-use alloy::{
-    network::Network,
-    primitives::{Address, aliases::I24},
-    providers::Provider,
-    rpc::types::Filter,
-    sol_types::SolEvent
-};
+use alloy_network::Network;
+use alloy_primitives::{Address, aliases::I24};
+use alloy_provider::Provider;
+use alloy_rpc_types::Filter;
+use alloy_sol_types::SolEvent;
 use futures::StreamExt;
 use uni_v4_common::{PoolKey, PoolKeyWithFees};
 
 /// Controller V1 address - this could be made configurable
 static CONTROLLER_V1_ADDRESS: OnceLock<Address> = OnceLock::new();
 
-alloy::sol! {
+alloy_sol_types::sol! {
     #[derive(Debug, PartialEq, Eq)]
     contract ControllerV1 {
         event PoolConfigured(

@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, I256};
+use alloy_primitives::{Address, I256};
 use liquidity_base::BaselineLiquidity;
 use pool_swap::{PoolSwap, PoolSwapResult};
 use serde::{Deserialize, Serialize};

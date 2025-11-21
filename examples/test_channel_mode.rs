@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use alloy::{network::Ethereum, primitives::address, providers::ProviderBuilder};
+use alloy_network::Ethereum;
+use alloy_primitives::address;
+use alloy_provider::ProviderBuilder;
 use eyre::Result;
 use tokio::sync::mpsc;
 use uni_v4_common::PoolUpdate;

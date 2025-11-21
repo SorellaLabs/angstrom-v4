@@ -5,7 +5,9 @@ use std::{
     task::{Context, Poll}
 };
 
-use alloy::{network::Network, primitives::Address, providers::Provider};
+use alloy_network::Network;
+use alloy_primitives::Address;
+use alloy_provider::Provider;
 use futures::{Future, Stream, StreamExt};
 use thiserror::Error;
 use tokio::sync::mpsc;

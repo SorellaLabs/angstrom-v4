@@ -1,10 +1,10 @@
-use alloy::sol_types::SolValue;
 use alloy_primitives::keccak256;
+use alloy_sol_types::SolValue;
 use serde::{Deserialize, Serialize};
 
 use crate::PoolId;
 
-alloy::sol!(
+alloy_sol_types::sol!(
     type Currency is address;
     type IHooks is address;
 

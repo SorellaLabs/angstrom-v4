@@ -50,7 +50,7 @@ pub trait PoolUpdateDelivery: Send + Sync {
     ) -> Option<(
         PoolId,
         std::collections::HashMap<i32, uni_v4_structure::tick_info::TickInfo>,
-        std::collections::HashMap<i16, alloy::primitives::U256>
+        std::collections::HashMap<i16, alloy_primitives::U256>
     )>;
 
     /// Get a new pool with full state

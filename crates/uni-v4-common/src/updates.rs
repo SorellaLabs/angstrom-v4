@@ -355,7 +355,7 @@ impl PoolUpdateDelivery for PoolUpdateQueue {
     ) -> Option<(
         PoolId,
         std::collections::HashMap<i32, uni_v4_structure::tick_info::TickInfo>,
-        std::collections::HashMap<i16, alloy::primitives::U256>
+        std::collections::HashMap<i16, alloy_primitives::U256>
     )> {
         match self.updates.front() {
             Some(PoolUpdate::NewTicks { pool_id, ticks, tick_bitmap }) => {

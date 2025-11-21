@@ -2,30 +2,6 @@
 members = [".", "crates/*", "examples"]
 resolver = "2"
 
-[package]
-name = "angstrom-v4"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-uni-v4-common = { path = "crates/uni-v4-common" }
-uni-v4-structure = { path = "crates/uni-v4-structure" }
-uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper" }
-
-# Re-export all the dependencies that downstream users might need
-alloy.workspace = true
-alloy-primitives.workspace = true
-jsonrpsee.workspace = true
-eyre.workspace = true
-futures.workspace = true
-tokio.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
-
-[features]
-default = []
-integration = []
-
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
@@ -39,22 +15,27 @@ uni-v4-structure = { path = "crates/uni-v4-structure" }
 uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper" }
 
 # External dependencies
-alloy = { version = "1.0.41", features = [
-  "rlp",
-  "full",
-  "node-bindings",
-  "rpc-types-debug",
-  "rpc-types-trace",
-  "json-rpc",
-  "rpc-client",
-  "sol-types",
-  "contract",
+alloy-contract = { version = "1.0.41", default-features = false }
+alloy-consensus = { version = "1.0.41", default-features = false }
+alloy-eips = { version = "1.0.41", default-features = false }
+alloy-network = { version = "1.0.41", default-features = false }
+alloy-provider = { version = "1.0.41", default-features = false, features = [
+  "reqwest",
+  "ws",
+  "rpc-api",
+  "anvil-node",
+] }
+alloy-rpc-types = { version = "1.0.41", default-features = false, features = [
+  "eth",
+] }
+alloy-sol-types = { version = "1.4.1", default-features = false, features = [
+  "json",
 ] }
 alloy-primitives = { version = "1.4.1", default-features = false, features = [
   "map-foldhash",
   "rand",
 ] }
-jsonrpsee = { version = "0.26.0", features = ["ws-client", "macros"] }
+jsonrpsee = { version = "0.26.0", features = ["ws-client", "macros", "client"] }
 arraydeque = "0"
 async-trait = "0.1"
 auto_impl = "1"

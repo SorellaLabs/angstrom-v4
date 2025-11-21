@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use alloy::primitives::{I256, U256};
+use alloy_primitives::{I256, U256};
 use itertools::Itertools;
 use malachite::num::conversion::traits::SaturatingInto;
 use serde::{Deserialize, Serialize};

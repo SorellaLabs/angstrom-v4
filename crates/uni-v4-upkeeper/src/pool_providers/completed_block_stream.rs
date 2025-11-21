@@ -1,7 +1,8 @@
 use std::{pin::Pin, sync::Arc, task::Poll};
 
-use alloy::{providers::Provider, rpc::types::Block};
 use alloy_primitives::B256;
+use alloy_provider::Provider;
+use alloy_rpc_types::Block;
 use futures::{FutureExt, Stream, StreamExt, future::BoxFuture, stream::FuturesOrdered};
 
 pub type BlockQueryResponse = Block;

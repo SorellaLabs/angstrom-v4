@@ -4,14 +4,12 @@ use std::{
     sync::Arc
 };
 
-use alloy::{
-    network::Network,
-    primitives::{
-        Address, U256,
-        aliases::{I24, U24}
-    },
-    providers::Provider
+use alloy_network::Network;
+use alloy_primitives::{
+    Address, U256,
+    aliases::{I24, U24}
 };
+use alloy_provider::Provider;
 use dashmap::DashMap;
 use futures::{Stream, StreamExt, future::BoxFuture, stream::FuturesUnordered};
 use thiserror::Error;
@@ -35,7 +33,7 @@ pub enum BaselinePoolFactoryError {
 }
 
 pub enum UpdateMessage {
-    NewTicks(PoolId, HashMap<i32, TickInfo>, HashMap<i16, alloy::primitives::U256>),
+    NewTicks(PoolId, HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>),
     NewPool(PoolId, BaselinePoolState)
 }
 
@@ -48,7 +46,7 @@ pub struct BaselinePoolFactory<P, N> {
     tick_edge_threshold: u16,
     ticks_per_batch:     usize,
     tick_loading: FuturesUnordered<
-        BoxFuture<'static, (PoolId, HashMap<i32, TickInfo>, HashMap<i16, alloy::primitives::U256>)>
+        BoxFuture<'static, (PoolId, HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>)>
     >,
     pool_generator: FuturesUnordered<
         BoxFuture<'static, Result<(PoolId, BaselinePoolState), BaselinePoolFactoryError>>
@@ -260,7 +258,7 @@ where
         tick_spacing: i32,
         block_number: Option<u64>
     ) -> Result<
-        (HashMap<i32, TickInfo>, HashMap<i16, alloy::primitives::U256>),
+        (HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>),
         BaselinePoolFactoryError
     > {
         // Load ticks in both directions concurrently
@@ -375,7 +373,7 @@ where
         mut fetched_ticks: Vec<TickData>,
         tick_spacing: i32
     ) -> Result<
-        (HashMap<i32, TickInfo>, HashMap<i16, alloy::primitives::U256>),
+        (HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>),
         BaselinePoolFactoryError
     > {
         let mut ticks = HashMap::new();
@@ -403,11 +401,11 @@ where
     /// Flips tick in bitmap if not already initialized
     fn flip_tick_if_not_init(
         &self,
-        tick_bitmap: &mut HashMap<i16, alloy::primitives::U256>,
+        tick_bitmap: &mut HashMap<i16, alloy_primitives::U256>,
         tick: i32,
         tick_spacing: i32
     ) {
-        use alloy::primitives::U256;
+        use alloy_primitives::U256;
 
         let compressed = tick / tick_spacing;
         let word_pos = (compressed >> 8) as i16;
@@ -431,7 +429,7 @@ where
         tick_band: u16,
         ticks_per_batch: usize
     ) -> Result<
-        (HashMap<i32, TickInfo>, HashMap<i16, alloy::primitives::U256>),
+        (HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>),
         BaselinePoolFactoryError
     > {
         // Load ticks in both directions concurrently
@@ -552,7 +550,7 @@ where
         mut fetched_ticks: Vec<TickData>,
         tick_spacing: i32
     ) -> Result<
-        (HashMap<i32, TickInfo>, HashMap<i16, alloy::primitives::U256>),
+        (HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>),
         BaselinePoolFactoryError
     > {
         let mut ticks = HashMap::new();

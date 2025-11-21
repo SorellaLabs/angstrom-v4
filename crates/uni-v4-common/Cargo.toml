@@ -7,8 +7,9 @@ repository.workspace = true
 
 [dependencies]
 # External dependencies
-alloy.workspace = true
+alloy-contract.workspace = true
 alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
 dashmap.workspace = true
 eyre.workspace = true
 serde.workspace = true

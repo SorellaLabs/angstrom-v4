@@ -1,13 +1,9 @@
 use std::{collections::HashMap, future::Future, sync::Arc};
 
-use alloy::{
-    network::Network,
-    primitives::{Address, BlockNumber, U256, aliases::I24},
-    providers::Provider,
-    sol,
-    sol_types::{SolEvent, SolType}
-};
-use alloy_primitives::{B256, I256, Log};
+use alloy_network::Network;
+use alloy_primitives::{Address, B256, BlockNumber, I256, Log, U256, aliases::I24};
+use alloy_provider::Provider;
+use alloy_sol_types::{SolEvent, SolType, sol};
 use itertools::Itertools;
 use uni_v4_common::{PoolError, PoolId as AngstromPoolId};
 use uni_v4_structure::{ray::Ray, sqrt_pricex96::SqrtPriceX96};

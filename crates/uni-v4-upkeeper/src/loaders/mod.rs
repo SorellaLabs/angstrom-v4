@@ -1,6 +1,6 @@
 #[rustfmt::skip]
 pub mod get_uniswap_v_4_pool_data {
-    alloy::sol!(
+    alloy_sol_types::sol!(
         #[allow(missing_docs)]
         #[sol(rpc)]
         #[derive(Debug, PartialEq, Eq,Hash, serde::Serialize, serde::Deserialize)]
@@ -10,7 +10,7 @@ pub mod get_uniswap_v_4_pool_data {
 }
 #[rustfmt::skip]
 pub mod get_uniswap_v_4_tick_data {
-    alloy::sol!(
+    alloy_sol_types::sol!(
         #[allow(missing_docs)]
         #[sol(rpc)]
         #[derive(Debug, PartialEq, Eq,Hash, serde::Serialize, serde::Deserialize)]
