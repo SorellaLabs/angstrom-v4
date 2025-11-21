@@ -4158,6 +4158,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
 [[package]]
+name = "uni-v4"
+version = "0.1.0"
+dependencies = [
+ "uni-v4-common",
+ "uni-v4-structure",
+ "uni-v4-upkeeper",
+]
+
+[[package]]
 name = "uni-v4-common"
 version = "0.1.0"
 dependencies = [

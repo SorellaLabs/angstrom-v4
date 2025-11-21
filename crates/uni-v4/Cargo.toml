@@ -1,0 +1,12 @@
+[package]
+name = "uni-v4"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Internal dependencies
+uni-v4-common.workspace = true
+uni-v4-structure.workspace = true
+uni-v4-upkeeper.workspace = true
