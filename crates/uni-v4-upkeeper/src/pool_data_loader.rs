@@ -5,7 +5,7 @@ use alloy_primitives::{Address, B256, BlockNumber, I256, Log, U256, aliases::I24
 use alloy_provider::Provider;
 use alloy_sol_types::{SolEvent, SolType, sol};
 use itertools::Itertools;
-use uni_v4_common::{PoolError, PoolId as AngstromPoolId};
+use uni_v4_common::{PoolError, PoolId as AngstromPoolId, PoolKey};
 use uni_v4_structure::{ray::Ray, sqrt_pricex96::SqrtPriceX96};
 use uniswap_v3_math::tick_math::{MAX_TICK, MIN_TICK};
 
@@ -88,6 +88,23 @@ sol! {
         event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick);
         event Burn(address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1);
         event Mint(address sender, address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1);
+    }
+}
+
+impl From<(PoolKey, PoolDataV4)> for PoolData {
+    fn from((pool_key, pool_data_v4): (PoolKey, PoolDataV4)) -> Self {
+        PoolData {
+            tokenA:         pool_key.currency0,
+            tokenADecimals: pool_data_v4.token0Decimals,
+            tokenB:         pool_key.currency1,
+            tokenBDecimals: pool_data_v4.token1Decimals,
+            liquidity:      pool_data_v4.liquidity,
+            sqrtPrice:      pool_data_v4.sqrtPrice,
+            tick:           pool_data_v4.tick,
+            tickSpacing:    pool_key.tickSpacing,
+            fee:            pool_key.fee,
+            liquidityNet:   pool_data_v4.liquidityNet
+        }
     }
 }
 
