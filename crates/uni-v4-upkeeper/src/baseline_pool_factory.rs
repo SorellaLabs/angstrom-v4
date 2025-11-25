@@ -134,29 +134,6 @@ where
         (this, Arc::new(pools))
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new_empty(
-        provider: Arc<P>,
-        pool_manager: Address,
-        tick_band: Option<u16>,
-        tick_edge_threshold: Option<u16>,
-        ticks_per_batch: Option<usize>
-    ) -> Self {
-        let registry = UniswapPoolRegistry::default();
-
-        Self {
-            provider,
-            registry,
-            pool_manager,
-            tick_band: tick_band.unwrap_or(INITIAL_TICKS_PER_SIDE),
-            tick_edge_threshold: tick_edge_threshold.unwrap_or(100),
-            ticks_per_batch: ticks_per_batch.unwrap_or(DEFAULT_TICKS_PER_BATCH),
-            tick_loading: FuturesUnordered::default(),
-            pool_generator: FuturesUnordered::default(),
-            _phantom: PhantomData
-        }
-    }
-
     pub fn is_processing(&self) -> bool {
         !(self.tick_loading.is_empty() || self.pool_generator.is_empty())
     }
