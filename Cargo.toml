@@ -55,7 +55,7 @@ rayon = "1"
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
-tokio = { version = "^1.44.2", features = [
+tokio = { version = "1.47.1", features = [
   "full",
   "tracing",
 ], default-features = false }
