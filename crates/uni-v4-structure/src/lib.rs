@@ -146,14 +146,14 @@ impl BaselinePoolState {
         amount: I256,
         direction: bool,
         is_bundle: bool,
-        limit_price: Option<SqrtPriceX96>
+        limit_price: SqrtPriceX96
     ) -> eyre::Result<PoolSwapResult<'_>> {
         let liq = self.liquidity.current();
 
         PoolSwap {
             liquidity: liq,
             target_amount: amount,
-            target_price: limit_price,
+            target_price: Some(limit_price),
             direction,
             fee_config: self.fee_config.clone(),
             is_bundle
