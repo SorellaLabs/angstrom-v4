@@ -141,6 +141,26 @@ impl BaselinePoolState {
         .swap()
     }
 
+    pub fn swap_current_with_amount_and_limit(
+        &self,
+        amount: I256,
+        direction: bool,
+        is_bundle: bool,
+        limit_price: Option<SqrtPriceX96>
+    ) -> eyre::Result<PoolSwapResult<'_>> {
+        let liq = self.liquidity.current();
+
+        PoolSwap {
+            liquidity: liq,
+            target_amount: amount,
+            target_price: limit_price,
+            direction,
+            fee_config: self.fee_config.clone(),
+            is_bundle
+        }
+        .swap()
+    }
+
     /// Swap to current price is designed to represent all swap outcomes as an
     /// amount in swap. Because of this, this swap does two swaps to make
     /// sure the values always align perfectly.
