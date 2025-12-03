@@ -126,14 +126,15 @@ impl BaselinePoolState {
         &self,
         amount: I256,
         direction: bool,
-        is_bundle: bool
+        is_bundle: bool,
+        limit_price: Option<SqrtPriceX96>
     ) -> eyre::Result<PoolSwapResult<'_>> {
         let liq = self.liquidity.current();
 
         PoolSwap {
             liquidity: liq,
             target_amount: amount,
-            target_price: None,
+            target_price: limit_price,
             direction,
             fee_config: self.fee_config.clone(),
             is_bundle
@@ -165,7 +166,7 @@ impl BaselinePoolState {
         let amount_in = if direction { price_swap.total_d_t0 } else { price_swap.total_d_t1 };
         let amount = I256::unchecked_from(amount_in);
 
-        self.swap_current_with_amount(amount, direction, is_bundle)
+        self.swap_current_with_amount(amount, direction, is_bundle, None)
     }
 
     /// Angstrom operates everything on amount in, If we don't need this
