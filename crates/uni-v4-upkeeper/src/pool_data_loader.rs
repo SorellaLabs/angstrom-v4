@@ -5,7 +5,7 @@ use alloy_primitives::{Address, B256, BlockNumber, I256, Log, U256, aliases::I24
 use alloy_provider::Provider;
 use alloy_sol_types::{SolEvent, SolType, sol};
 use itertools::Itertools;
-use uni_v4_common::{PoolError, PoolId as AngstromPoolId};
+use uni_v4_common::{PoolError, PoolId as AngstromPoolId, PoolKey};
 use uni_v4_structure::{ray::Ray, sqrt_pricex96::SqrtPriceX96};
 use uniswap_v3_math::tick_math::{MAX_TICK, MIN_TICK};
 
@@ -307,5 +307,22 @@ impl PoolDataLoader for DataLoader {
             liquidity:      swap_event.liquidity,
             tick:           swap_event.tick.as_i32()
         })
+    }
+}
+
+impl From<(PoolKey, PoolDataV4)> for PoolData {
+    fn from((pool_key, pool_data_v4): (PoolKey, PoolDataV4)) -> Self {
+        PoolData {
+            tokenA:         pool_key.currency0,
+            tokenADecimals: pool_data_v4.token0Decimals,
+            tokenB:         pool_key.currency1,
+            tokenBDecimals: pool_data_v4.token1Decimals,
+            liquidity:      pool_data_v4.liquidity,
+            sqrtPrice:      pool_data_v4.sqrtPrice,
+            tick:           pool_data_v4.tick,
+            tickSpacing:    pool_key.tickSpacing,
+            fee:            pool_key.fee,
+            liquidityNet:   pool_data_v4.liquidityNet
+        }
     }
 }
