@@ -185,7 +185,7 @@ impl BaselinePoolState {
         let amount_in = if direction { price_swap.total_d_t0 } else { price_swap.total_d_t1 };
         let amount = I256::unchecked_from(amount_in);
 
-        self.swap_current_with_amount(amount, direction, is_bundle, None)
+        self.swap_current_with_amount(amount, direction, is_bundle)
     }
 
     /// Angstrom operates everything on amount in, If we don't need this
