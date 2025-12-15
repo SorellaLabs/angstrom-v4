@@ -5,22 +5,27 @@ use alloy_primitives::{I256, U256};
 use uniswap_v3_math::tick_math::{MAX_SQRT_RATIO, MIN_SQRT_RATIO};
 
 use super::{FeeConfiguration, liquidity_base::LiquidityAtPoint};
-use crate::{ray::Ray, sqrt_pricex96::SqrtPriceX96};
+use crate::{calculate_l2_mev_tax, ray::Ray, sqrt_pricex96::SqrtPriceX96};
 
 const U256_1: U256 = U256::from_limbs([1, 0, 0, 0]);
 
 #[derive(Debug, Clone)]
 pub struct PoolSwap<'a> {
-    pub(super) liquidity:     LiquidityAtPoint<'a>,
+    pub(super) liquidity:      LiquidityAtPoint<'a>,
     /// swap to sqrt price limit
-    pub(super) target_price:  Option<SqrtPriceX96>,
+    pub(super) target_price:   Option<SqrtPriceX96>,
     /// if its negative, it is an exact out.
-    pub(super) target_amount: I256,
+    pub(super) target_amount:  I256,
     /// zfo = true
-    pub(super) direction:     bool,
+    pub(super) direction:      bool,
     // the fee configuration of the pool.
-    pub(super) fee_config:    FeeConfiguration,
-    pub(super) is_bundle:     bool
+    pub(super) fee_config:     FeeConfiguration,
+    pub(super) is_bundle:      bool,
+    /// L2 MEV tax amount in wei (only applicable for L2 pools).
+    /// This is calculated as: SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS *
+    /// priority_fee Use `calculate_l2_mev_tax(priority_fee)` to compute
+    /// this value.
+    pub(super) mev_tax_amount: Option<u128>
 }
 
 impl<'a> PoolSwap<'a> {
@@ -71,7 +76,7 @@ impl<'a> PoolSwap<'a> {
             };
 
             // Use 0 fee for bundle mode, swap_fee for unlocked mode
-            let swap_fee = if self.is_bundle { 0 } else { self.fee_config.swap_fee };
+            let swap_fee = if self.is_bundle { 0 } else { self.fee_config.swap_fee() };
 
             let (new_sqrt_price_x_96, amount_in, amount_out, fee_amount) =
                 uniswap_v3_math::swap_math::compute_swap_step(
@@ -123,7 +128,7 @@ impl<'a> PoolSwap<'a> {
 
         // Calculate and apply protocol fee directly to deltas for unlocked mode
         let (final_d_t0, final_d_t1) = if !self.is_bundle {
-            let fee_rate_e6 = U256::from(self.fee_config.protocol_fee);
+            let fee_rate_e6 = U256::from(self.fee_config.protocol_fee());
             let one_e6 = U256::from(1_000_000);
 
             // Determine which token gets the protocol fee based on swap direction
@@ -172,6 +177,23 @@ impl<'a> PoolSwap<'a> {
             (total_d_t0, total_d_t1)
         };
 
+        // Apply L2 MEV tax to token0 (ETH) delta if applicable.
+        // In L2 pools, token0 is always native ETH.
+        // - zeroForOne=true (selling ETH): user pays more ETH (add tax to input)
+        // - zeroForOne=false (buying ETH): user receives less ETH (subtract tax from
+        //   output)
+        let (final_d_t0, final_d_t1) = if let Some(mev_tax) = self.mev_tax_amount {
+            if self.direction {
+                // Selling ETH: add MEV tax to token0 input
+                (final_d_t0.saturating_add(mev_tax), final_d_t1)
+            } else {
+                // Buying ETH: subtract MEV tax from token0 output
+                (final_d_t0.saturating_sub(mev_tax), final_d_t1)
+            }
+        } else {
+            (final_d_t0, final_d_t1)
+        };
+
         Ok(PoolSwapResult {
             fee_config: self.fee_config,
             start_price: range_start,
@@ -208,18 +230,43 @@ impl<'a> PoolSwapResult<'a> {
         amount: I256,
         direction: bool
     ) -> eyre::Result<PoolSwapResult<'a>> {
+        self.swap_to_amount_with_mev_tax(amount, direction, None)
+    }
+
+    /// Initialize a swap from the end of this swap with MEV tax applied.
+    /// Pass the priority fee (tx.gasprice - block.basefee) in wei to calculate
+    /// the MEV tax.
+    pub fn swap_to_amount_with_mev_tax(
+        &'a self,
+        amount: I256,
+        direction: bool,
+        priority_fee_wei: Option<u128>
+    ) -> eyre::Result<PoolSwapResult<'a>> {
+        let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
         PoolSwap {
             liquidity: self.end_liquidity.clone(),
             target_price: None,
             direction,
             target_amount: amount,
             fee_config: self.fee_config.clone(),
-            is_bundle: self.is_bundle
+            is_bundle: self.is_bundle,
+            mev_tax_amount
         }
         .swap()
     }
 
     pub fn swap_to_price(&'a self, price_limit: SqrtPriceX96) -> eyre::Result<PoolSwapResult<'a>> {
+        self.swap_to_price_with_mev_tax(price_limit, None)
+    }
+
+    /// Swap to price with MEV tax applied.
+    /// Pass the priority fee (tx.gasprice - block.basefee) in wei to calculate
+    /// the MEV tax.
+    pub fn swap_to_price_with_mev_tax(
+        &'a self,
+        price_limit: SqrtPriceX96,
+        priority_fee_wei: Option<u128>
+    ) -> eyre::Result<PoolSwapResult<'a>> {
         let direction = self.end_price >= price_limit;
 
         let price_swap = PoolSwap {
@@ -228,14 +275,15 @@ impl<'a> PoolSwapResult<'a> {
             direction,
             target_amount: I256::MAX,
             fee_config: self.fee_config.clone(),
-            is_bundle: self.is_bundle
+            is_bundle: self.is_bundle,
+            mev_tax_amount: None // Don't apply MEV tax to price discovery swap
         }
         .swap()?;
 
         let amount_in = if direction { price_swap.total_d_t0 } else { price_swap.total_d_t1 };
         let amount = I256::unchecked_from(amount_in);
 
-        self.swap_to_amount(amount, direction)
+        self.swap_to_amount_with_mev_tax(amount, direction, priority_fee_wei)
     }
 
     pub fn was_empty_swap(&self) -> bool {

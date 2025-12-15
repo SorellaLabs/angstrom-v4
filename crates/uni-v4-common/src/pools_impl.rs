@@ -91,10 +91,7 @@ impl UniswapPools {
                         continue;
                     };
                     let fees = pool.fees_mut();
-
-                    fees.bundle_fee = bundle_fee;
-                    fees.swap_fee = swap_fee;
-                    fees.protocol_fee = protocol_fee;
+                    fees.update_l1_fees(Some(bundle_fee), Some(swap_fee), Some(protocol_fee));
                 }
                 PoolUpdate::UpdatedSlot0 { pool_id, data } => {
                     let Some(pool) = self.pools.get_mut(&pool_id) else {

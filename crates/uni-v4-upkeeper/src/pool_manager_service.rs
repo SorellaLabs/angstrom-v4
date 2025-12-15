@@ -298,9 +298,7 @@ where
             PoolUpdate::FeeUpdate { pool_id, bundle_fee, swap_fee, protocol_fee, .. } => {
                 if let Some(mut pool) = self.pools.get_pools().get_mut(pool_id) {
                     let fees = pool.fees_mut();
-                    fees.bundle_fee = *bundle_fee;
-                    fees.swap_fee = *swap_fee;
-                    fees.protocol_fee = *protocol_fee;
+                    fees.update_l1_fees(Some(*bundle_fee), Some(*swap_fee), Some(*protocol_fee));
 
                     tracing::info!(
                         "Updated fees for pool {:?}: bundle_fee: {}, swap_fee: {}, protocol_fee: \

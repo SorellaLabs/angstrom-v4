@@ -235,8 +235,9 @@ where
             tick_bitmap
         );
 
-        // Create fee configuration with provided values
-        let fee_config = uni_v4_structure::FeeConfiguration { bundle_fee, swap_fee, protocol_fee };
+        // Create fee configuration with provided values (L1 configuration for Angstrom)
+        let fee_config =
+            uni_v4_structure::FeeConfiguration::new_l1(bundle_fee, swap_fee, protocol_fee);
 
         // Create and return BaselinePoolState
         Ok(BaselinePoolState::new(
@@ -787,9 +788,9 @@ where
                 tick_bitmap
             );
 
-            // Create fee configuration with provided values
+            // Create fee configuration with provided values (L1 configuration for Angstrom)
             let fee_config =
-                uni_v4_structure::FeeConfiguration { bundle_fee, swap_fee, protocol_fee };
+                uni_v4_structure::FeeConfiguration::new_l1(bundle_fee, swap_fee, protocol_fee);
 
             // Create and return BaselinePoolState with Uniswap pool_id
             Ok((
