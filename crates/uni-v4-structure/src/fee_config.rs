@@ -1,6 +1,6 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// L2 MEV tax constants from AngstromL2.sol
 /// The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap.
@@ -17,14 +17,14 @@ pub fn calculate_l2_mev_tax(priority_fee_wei: u128) -> u128 {
 }
 
 /// Fee configuration for different pool modes
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct L1FeeConfiguration {
     pub bundle_fee:   u32, // Stored fee for bundle mode
     pub swap_fee:     u32, // Applied during swaps in unlocked mode
     pub protocol_fee: u32  // Applied after swaps in unlocked mode (basis points in 1e6)
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct L2FeeConfiguration {
     pub is_initialized:       bool,
     pub creator_tax_fee_e6:   u32,
@@ -148,9 +148,10 @@ pub struct L2FeeConfiguration {
 //         matches!(self, FeeConfiguration::L2(_))
 //     }
 // }
-
-pub trait FeeConfig: Debug + Clone + Send + Sync + Unpin {
-    type Update: Debug + Clone + Copy + Send + Sync;
+pub trait FeeConfig:
+    Debug + Clone + Copy + PartialEq + Eq + Hash + Ord + PartialOrd + Send + Sync + Unpin
+{
+    type Update: Debug + Clone + Copy + Send + Sync + Unpin;
 
     /// Returns the swap fee applied during the swap (in compute_swap_step).
     /// - L1: LP fee charged during swap
@@ -222,15 +223,28 @@ impl FeeConfig for L2FeeConfiguration {
         self.swap_fee() + self.protocol_fee()
     }
 
-    fn update_fees(&mut self, update: Self::Update) {}
+    fn update_fees(&mut self, update: Self::Update) {
+        let Self::Update { protocol_tax_fee_e6, protocol_swap_fee_e6 } = update;
+
+        if let Some(fee) = protocol_tax_fee_e6 {
+            self.protocol_tax_fee_e6 = fee;
+        }
+
+        if let Some(fee) = protocol_swap_fee_e6 {
+            self.protocol_swap_fee_e6 = fee;
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct L1FeeUpdate {
     pub bundle_fee:   u32,
     pub swap_fee:     u32,
     pub protocol_fee: u32
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct L2FeeUpdate {}
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct L2FeeUpdate {
+    pub protocol_tax_fee_e6:  Option<u32>,
+    pub protocol_swap_fee_e6: Option<u32>
+}

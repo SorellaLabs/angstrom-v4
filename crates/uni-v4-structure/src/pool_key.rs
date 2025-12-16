@@ -2,7 +2,7 @@ use alloy_primitives::keccak256;
 use alloy_sol_types::SolValue;
 use serde::{Deserialize, Serialize};
 
-use crate::PoolId;
+use crate::{PoolId, V4Network, fee_config::FeeConfig};
 
 alloy_sol_types::sol!(
     type Currency is address;
@@ -25,11 +25,9 @@ alloy_sol_types::sol!(
 
 /// Pool key with fee configuration
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct PoolKeyWithFees {
-    pub pool_key:     PoolKey,
-    pub bundle_fee:   u32,
-    pub swap_fee:     u32,
-    pub protocol_fee: u32
+pub struct PoolKeyWithFees<F: FeeConfig> {
+    pub pool_key: PoolKey,
+    pub fee_cfg:  F
 }
 
 impl From<PoolKey> for PoolId {

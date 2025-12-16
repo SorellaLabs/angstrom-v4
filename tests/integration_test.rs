@@ -16,7 +16,7 @@ use futures::Stream;
 use uni_v4_upkeeper::{
     pool_manager_service_builder::PoolManagerServiceBuilder,
     pool_providers::pool_update_provider::{PoolUpdateProvider, StateStream},
-    pool_registry::UniswapPoolRegistry,
+    pool_registry::l1::L1PoolRegistry,
     slot0::NoOpSlot0Stream
 };
 
@@ -134,7 +134,7 @@ async fn test_pool_state_consistency() {
         pool_manager_address,
         controller_address,
         angstrom_address,
-        UniswapPoolRegistry::default(),
+        L1PoolRegistry::default(),
         initial_block
     );
 

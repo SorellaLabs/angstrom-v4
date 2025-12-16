@@ -1,15 +1,19 @@
 use std::{collections::HashMap, future::Future, sync::Arc};
 
-use alloy_network::Network;
 use alloy_primitives::{Address, B256, BlockNumber, I256, Log, U256, aliases::I24};
 use alloy_provider::Provider;
 use alloy_sol_types::{SolEvent, SolType, sol};
 use itertools::Itertools;
-use uni_v4_common::PoolError;
-use uni_v4_structure::{PoolId as AngstromPoolId, PoolKey, ray::Ray, sqrt_pricex96::SqrtPriceX96};
+use uni_v4_common::{PoolError, V4Network};
+use uni_v4_structure::{
+    PoolId as AngstromPoolId, PoolKey,
+    pool_registry::{PoolRegistry, UniswapPoolIdSet},
+    ray::Ray,
+    sqrt_pricex96::SqrtPriceX96
+};
 use uniswap_v3_math::tick_math::{MAX_TICK, MIN_TICK};
 
-use super::loaders::{
+use super::bindings::{
     get_uniswap_v_4_pool_data::GetUniswapV4PoolData,
     get_uniswap_v_4_tick_data::GetUniswapV4TickData
 };
@@ -106,16 +110,15 @@ pub struct ModifyPositionEvent {
     pub liquidity_delta: i128
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct DataLoader {
-    private_address: AngstromPoolId,
-    public_address:  AngstromPoolId,
-    pool_registry:   Option<UniswapPoolRegistry>,
-    pool_manager:    Option<Address>
+#[derive(Debug, Clone)]
+pub struct DataLoader<T: V4Network> {
+    pool_id_set:   <T::PoolRegistry as PoolRegistry>::PoolIdSet,
+    pool_registry: Option<T::PoolRegistry>,
+    pool_manager:  Option<Address>
 }
 
-impl DataLoader {
-    pub fn pool_registry(&self) -> Option<UniswapPoolRegistry> {
+impl<T: V4Network> DataLoader<T> {
+    pub fn pool_registry(&self) -> Option<T::PoolRegistry> {
         self.pool_registry.clone()
     }
 
@@ -124,8 +127,8 @@ impl DataLoader {
     }
 }
 
-pub trait PoolDataLoader: Clone {
-    fn load_tick_data<P: Provider<N>, N: Network>(
+pub trait PoolDataLoader<T: V4Network>: Clone {
+    fn load_tick_data<P: Provider<T>>(
         &self,
         current_tick: I24,
         zero_for_one: bool,
@@ -135,14 +138,14 @@ pub trait PoolDataLoader: Clone {
         provider: Arc<P>
     ) -> impl Future<Output = Result<(Vec<TickData>, U256), PoolError>> + Send;
 
-    fn load_pool_data<P: Provider<N>, N: Network>(
+    fn load_pool_data<P: Provider<T>>(
         &self,
         block_number: Option<BlockNumber>,
         provider: Arc<P>
     ) -> impl Future<Output = Result<PoolData, PoolError>> + Send;
 
-    fn private_address(&self) -> AngstromPoolId;
-    fn public_address(&self) -> AngstromPoolId;
+    fn id_set(&self) -> <T::PoolRegistry as PoolRegistry>::PoolIdSet;
+
     fn pool_fee(&self) -> u32;
 
     fn group_logs(logs: Vec<Log>) -> HashMap<AngstromPoolId, Vec<Log>>;
@@ -152,42 +155,36 @@ pub trait PoolDataLoader: Clone {
     fn decode_swap_event(log: &Log) -> Result<SwapEvent, PoolError>;
 }
 
-impl DataLoader {
+impl<T: V4Network> DataLoader<T> {
     fn pool_manager(&self) -> Address {
         self.pool_manager
             .expect("pool_manager must be set for V4 pools")
     }
 
     pub fn new_with_registry(
-        private_address: AngstromPoolId,
-        public_address: AngstromPoolId,
-        registry: UniswapPoolRegistry,
+        pool_id_set: <T::PoolRegistry as PoolRegistry>::PoolIdSet,
+        registry: T::PoolRegistry,
         pool_manager: Address
     ) -> Self {
-        Self {
-            private_address,
-            public_address,
-            pool_registry: Some(registry),
-            pool_manager: Some(pool_manager)
-        }
+        Self { pool_id_set, pool_registry: Some(registry), pool_manager: Some(pool_manager) }
     }
 }
 
-impl PoolDataLoader for DataLoader {
+impl<T: V4Network> PoolDataLoader<T> for DataLoader<T> {
     fn pool_fee(&self) -> u32 {
-        let id = self.public_address();
+        let id = self.id_set().uniswap_pool_id();
 
         let pool_key = *self.pool_registry.as_ref().unwrap().get(&id).unwrap();
 
         pool_key.fee.to()
     }
 
-    async fn load_pool_data<P: Provider<N>, N: Network>(
+    async fn load_pool_data<P: Provider<T>>(
         &self,
         block_number: Option<BlockNumber>,
         provider: Arc<P>
     ) -> Result<PoolData, PoolError> {
-        let id = self.public_address();
+        let id = self.id_set().uniswap_pool_id();
 
         let pool_key = *self.pool_registry.as_ref().unwrap().get(&id).unwrap();
 
@@ -195,7 +192,7 @@ impl PoolDataLoader for DataLoader {
 
         let deployer = GetUniswapV4PoolData::deploy_builder(
             provider,
-            self.private_address(),
+            id,
             self.pool_manager(),
             pool_key.currency0,
             pool_key.currency1
@@ -222,7 +219,7 @@ impl PoolDataLoader for DataLoader {
         })
     }
 
-    async fn load_tick_data<P: Provider<N>, N: Network>(
+    async fn load_tick_data<P: Provider<T>>(
         &self,
         current_tick: I24,
         zero_for_one: bool,
@@ -233,7 +230,7 @@ impl PoolDataLoader for DataLoader {
     ) -> Result<(Vec<TickData>, U256), PoolError> {
         let deployer = GetUniswapV4TickData::deploy_builder(
             provider.clone(),
-            self.private_address(),
+            self.id_set().uniswap_pool_id(),
             self.pool_manager(),
             zero_for_one,
             current_tick,
@@ -258,12 +255,8 @@ impl PoolDataLoader for DataLoader {
         ))
     }
 
-    fn public_address(&self) -> AngstromPoolId {
-        self.public_address
-    }
-
-    fn private_address(&self) -> AngstromPoolId {
-        self.private_address
+    fn id_set(&self) -> <T::PoolRegistry as PoolRegistry>::PoolIdSet {
+        self.pool_id_set
     }
 
     fn group_logs(logs: Vec<Log>) -> HashMap<AngstromPoolId, Vec<Log>> {

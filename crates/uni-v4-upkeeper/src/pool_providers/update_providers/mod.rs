@@ -4,26 +4,22 @@ pub mod l2;
 use std::{
     collections::{HashSet, VecDeque},
     future::Future,
-    marker::PhantomData,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll}
 };
 
-use alloy_consensus::{BlockHeader, Transaction};
+use alloy_consensus::BlockHeader;
 use alloy_eips::BlockId;
-use alloy_network::{BlockResponse, Ethereum, Network};
-use alloy_primitives::{Address, U160, aliases::I24};
+use alloy_network::BlockResponse;
+use alloy_primitives::{Address, U160};
 use alloy_provider::Provider;
 use alloy_rpc_types::{Block, Filter};
-use alloy_sol_types::{SolCall, SolEvent};
+use alloy_sol_types::SolEvent;
 use futures::{FutureExt, StreamExt, stream::Stream};
-use op_alloy_network::Optimism;
 use thiserror::Error;
 use uni_v4_common::{ModifyLiquidityEventData, PoolUpdate, StreamMode, SwapEventData, V4Network};
-use uni_v4_structure::{
-    PoolId, UpdatePool, pool_registry::UniswapPoolRegistry, updates::Slot0Data
-};
+use uni_v4_structure::{PoolId, UpdatePool, pool_registry::PoolRegistry, updates::Slot0Data};
 
 use crate::{
     pool_data_loader::{DataLoader, IUniswapV4Pool, PoolDataLoader},
@@ -348,18 +344,16 @@ where
         block: u64
     ) -> Result<Slot0Data, PoolUpdateError> {
         // Get the internal pool ID from the conversion map
-        let internal_pool_id =
-            self.pool_registry
-                .conversion_map
-                .get(&pool_id)
-                .ok_or_else(|| {
-                    PoolUpdateError::Provider(format!("Pool ID {pool_id:?} not found in registry"))
-                })?;
+        let pool_id_set = self
+            .pool_registry
+            .make_pool_id_set(pool_id)
+            .ok_or_else(|| {
+                PoolUpdateError::Provider(format!("Pool ID {pool_id:?} not found in registry"))
+            })?;
 
         // Create a DataLoader for this pool
         let data_loader = DataLoader::new_with_registry(
-            *internal_pool_id,
-            pool_id,
+            pool_id_set,
             self.pool_registry.clone(),
             self.pool_manager
         );
@@ -625,7 +619,8 @@ pub struct StateStream<P, T, B>
 where
     P: Provider<T> + 'static,
     T: V4Network,
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    B: Stream<Item = Block> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
     update_provider:      Option<PoolUpdateProvider<P, T>>,
     block_stream:         B,
@@ -634,14 +629,15 @@ where
     >,
     start_tracking_pools: Vec<PoolId>,
     stop_tracking_pools:  Vec<PoolId>,
-    pool_reg:             Option<UniswapPoolRegistry>
+    pool_reg:             Option<T::PoolRegistry>
 }
 
 impl<P, T, B> StateStream<P, T, B>
 where
     P: Provider<T> + 'static,
     T: V4Network,
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    B: Stream<Item = Block> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
     pub fn new(update_provider: PoolUpdateProvider<P, T>, block_stream: B) -> Self {
         Self {
@@ -659,7 +655,8 @@ impl<P, T, B> PoolEventStream<T> for StateStream<P, T, B>
 where
     P: Provider<T> + 'static,
     T: V4Network,
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    B: Stream<Item = Block> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
     fn stop_tracking_pool(&mut self, pool_id: PoolId) {
         if let Some(update_provider) = self.update_provider.as_mut() {
@@ -690,7 +687,8 @@ impl<P, T, B> Stream for StateStream<P, T, B>
 where
     P: Provider<T> + 'static,
     T: V4Network,
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    B: Stream<Item = Block> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
     type Item = Vec<PoolUpdate<T>>;
 

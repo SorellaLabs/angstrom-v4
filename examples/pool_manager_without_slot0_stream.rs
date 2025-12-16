@@ -10,7 +10,7 @@ use uni_v4_upkeeper::{
         completed_block_stream::CompletedBlockStream,
         pool_update_provider::{PoolUpdateProvider, StateStream}
     },
-    pool_registry::UniswapPoolRegistry,
+    pool_registry::l1::L1PoolRegistry,
     slot0::NoOpSlot0Stream
 };
 
@@ -44,7 +44,7 @@ async fn main() -> eyre::Result<()> {
     println!("\n📡 Example 1: Building pool manager with event stream only...");
 
     // Create event stream for block-based updates
-    let pool_registry = UniswapPoolRegistry::default();
+    let pool_registry = L1PoolRegistry::default();
     let update_provider = PoolUpdateProvider::new(
         provider.clone(),
         pool_manager_address,

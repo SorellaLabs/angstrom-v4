@@ -1,10 +1,8 @@
-use std::{cmp::Ordering, collections::HashMap};
-
 use alloy_network::Ethereum;
-use alloy_primitives::{Address, B256, I256, U160, U256};
+use alloy_primitives::{Address, B256, U160};
 use serde::{Deserialize, Serialize};
 
-use crate::{BaselinePoolState, UpdatePool, V4Network, tick_info::TickInfo};
+use crate::{BaselinePoolState, UpdatePool};
 
 /// Different types of pool updates
 #[derive(Debug, Clone)]

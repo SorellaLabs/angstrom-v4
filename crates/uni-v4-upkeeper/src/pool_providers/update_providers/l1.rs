@@ -1,13 +1,19 @@
+use std::collections::HashSet;
+
 use alloy_consensus::Transaction;
 use alloy_eips::BlockId;
 use alloy_network::{BlockResponse, Ethereum};
-use alloy_primitives::aliases::I24;
+use alloy_primitives::{Address, aliases::I24};
 use alloy_provider::Provider;
 use alloy_rpc_types::Filter;
 use alloy_sol_types::{SolCall, SolEvent};
-pub use types::*;
-use uni_v4_common::PoolUpdate;
-use uni_v4_structure::{PoolId, PoolKey, fee_config::L1FeeUpdate, updates::l1::L1PoolUpdate};
+use futures::StreamExt;
+// pub use types::*;
+use uni_v4_common::{PoolUpdate, V4Network};
+use uni_v4_structure::{
+    L1AddressBook, L1FeeConfiguration, PoolId, PoolKey, PoolKeyWithFees, fee_config::L1FeeUpdate,
+    pool_registry::PoolRegistry, updates::l1::L1PoolUpdate
+};
 
 use crate::pool_providers::{
     ProviderChainUpdate,
@@ -145,7 +151,7 @@ where
         for log in logs {
             let block_number = log.block_number.unwrap();
 
-            if let Ok(event) = ControllerV1::PoolConfigured::decode_log(&log.inner) {
+            if let Ok(event) = types::ControllerV1::PoolConfigured::decode_log(&log.inner) {
                 let pool_key = PoolKey {
                     currency0:   event.asset0,
                     currency1:   event.asset1,
@@ -178,7 +184,7 @@ where
                 });
             }
 
-            if let Ok(event) = ControllerV1::PoolRemoved::decode_log(&log.inner) {
+            if let Ok(event) = types::ControllerV1::PoolRemoved::decode_log(&log.inner) {
                 let pool_key = PoolKey {
                     currency0:   event.asset0,
                     currency1:   event.asset1,
@@ -215,7 +221,7 @@ where
         // Check if transaction is to the controller
         if tx.to() == Some(self.address_book().controller_v1) {
             // Try to decode as batchUpdatePools call
-            if let Ok(call) = ControllerV1::batchUpdatePoolsCall::abi_decode(tx.input()) {
+            if let Ok(call) = types::ControllerV1::batchUpdatePoolsCall::abi_decode(tx.input()) {
                 for update in call.updates {
                     // Normalize asset order
                     let (_asset0, _asset1) = if update.assetB > update.assetA {
@@ -223,9 +229,11 @@ where
                     } else {
                         (update.assetB, update.assetA)
                     };
-                    let pools = self
-                        .pool_registry
-                        .get_pools_by_token_pair(update.assetA, update.assetB);
+                    let pools = self.pool_registry.get_pools_by_token_pair(
+                        update.assetA,
+                        update.assetB,
+                        Some(self.address_book().angstrom)
+                    );
 
                     // Find the pool with matching fee (or just use the first one if no match)
                     let pool_key = pools
@@ -259,4 +267,102 @@ where
 
         updates
     }
+}
+
+pub async fn fetch_angstrom_pools<P>(
+    mut deploy_block: u64,
+    end_block: u64,
+    angstrom_address: Address,
+    controller_address: Address,
+    db: &P
+) -> Vec<PoolKeyWithFees<L1FeeConfiguration>>
+where
+    P: Provider<Ethereum>
+{
+    let mut filters = vec![];
+
+    loop {
+        let this_end_block = std::cmp::min(deploy_block + 99_999, end_block);
+
+        if this_end_block == deploy_block {
+            break;
+        }
+
+        tracing::info!(?deploy_block, ?this_end_block);
+        let filter = Filter::new()
+            .from_block(deploy_block as u64)
+            .to_block(this_end_block as u64)
+            .address(controller_address);
+
+        filters.push(filter);
+
+        deploy_block = std::cmp::min(end_block, this_end_block);
+    }
+
+    let logs = futures::stream::iter(filters)
+        .map(|filter| async move {
+            db.get_logs(&filter)
+                .await
+                .unwrap()
+                .into_iter()
+                .collect::<Vec<_>>()
+        })
+        .buffered(10)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+
+    logs.into_iter()
+        .fold(HashSet::new(), |mut set, log| {
+            if let Ok(pool) =
+                types::ControllerV1::PoolConfigured::decode_log(&log.clone().into_inner())
+            {
+                let pool_key_with_fees = PoolKeyWithFees {
+                    pool_key: PoolKey {
+                        currency0:   pool.asset0,
+                        currency1:   pool.asset1,
+                        fee:         pool.bundleFee,
+                        tickSpacing: I24::unchecked_from(pool.tickSpacing),
+                        hooks:       angstrom_address
+                    },
+                    fee_cfg:  L1FeeConfiguration {
+                        bundle_fee:   pool.bundleFee.to(),
+                        swap_fee:     pool.unlockedFee.to(),
+                        protocol_fee: pool.protocolUnlockedFee.to()
+                    }
+                };
+
+                set.insert(pool_key_with_fees);
+                return set;
+            }
+
+            if let Ok(pool) =
+                types::ControllerV1::PoolRemoved::decode_log(&log.clone().into_inner())
+            {
+                // For removal, we need to match by pool key, so we create a dummy with default
+                // fees
+                let pool_key_with_fees = PoolKeyWithFees {
+                    pool_key: PoolKey {
+                        currency0:   pool.asset0,
+                        currency1:   pool.asset1,
+                        fee:         pool.feeInE6,
+                        tickSpacing: pool.tickSpacing,
+                        hooks:       angstrom_address
+                    },
+                    fee_cfg:  L1FeeConfiguration {
+                        bundle_fee:   0,
+                        swap_fee:     0,
+                        protocol_fee: 0
+                    }
+                };
+
+                set.retain(|p| p.pool_key != pool_key_with_fees.pool_key);
+                return set;
+            }
+            set
+        })
+        .into_iter()
+        .collect::<Vec<_>>()
 }

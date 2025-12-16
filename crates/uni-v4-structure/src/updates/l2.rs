@@ -1,6 +1,5 @@
-use alloy_primitives::{Address, B256, U160};
+use alloy_primitives::{Address, B256};
 use op_alloy_network::Optimism;
-use serde::{Deserialize, Serialize};
 
 use crate::{BaselinePoolState, UpdatePool};
 
@@ -15,7 +14,9 @@ pub enum L2PoolUpdate {
         protocol_tax_fee_e6:  u32,
         creator_swap_fee_e6:  u32,
         protocol_swap_fee_e6: u32,
+        hook_fee:             u32,
         tick_spacing:         i32,
+        hook:                 Address,
         block:                u64
     }
 }
@@ -30,6 +31,8 @@ impl L2PoolUpdate {
         creator_swap_fee_e6: u32,
         protocol_swap_fee_e6: u32,
         tick_spacing: i32,
+        hook_fee: u32,
+        hook: Address,
         block: u64
     ) -> Self {
         L2PoolUpdate::NewPool {
@@ -39,34 +42,13 @@ impl L2PoolUpdate {
             creator_tax_fee_e6,
             protocol_tax_fee_e6,
             creator_swap_fee_e6,
+            hook_fee,
+            hook,
             protocol_swap_fee_e6,
             tick_spacing,
             block
         }
     }
-}
-
-/// Current slot0 data for a pool
-#[derive(Debug, Clone)]
-pub struct Slot0Data {
-    pub sqrt_price_x96: U160,
-    pub tick:           i32,
-    pub liquidity:      u128
-}
-
-/// Slot0 update from real-time feed
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub struct Slot0Update {
-    /// there will be 120 updates per block or per 100ms
-    pub seq_id:           u16,
-    /// in case of block lag on node
-    pub current_block:    u64,
-    pub angstrom_pool_id: B256,
-    pub uni_pool_id:      B256,
-
-    pub sqrt_price_x96: U160,
-    pub liquidity:      u128,
-    pub tick:           i32
 }
 
 impl UpdatePool<Optimism> for L2PoolUpdate {
@@ -88,8 +70,7 @@ impl UpdatePool<Optimism> for L2PoolUpdate {
 
     fn is_initialization_event(&self) -> bool {
         match self {
-            L2PoolUpdate::NewPool { .. } => true,
-            _ => false
+            L2PoolUpdate::NewPool { .. } => true
         }
     }
 }

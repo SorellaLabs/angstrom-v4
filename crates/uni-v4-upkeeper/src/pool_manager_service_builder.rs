@@ -13,7 +13,11 @@ use super::{
     pool_manager_service::{PoolManagerService, PoolManagerServiceError},
     slot0::Slot0Stream
 };
-use crate::pool_providers::PoolEventStream;
+use crate::{
+    pool_data_loader::PoolDataLoader,
+    pool_manager_service::PoolEventProcessor,
+    pool_providers::{PoolEventStream, ProviderChainInitialization}
+};
 
 /// Builder for creating a configured PoolManagerService
 pub struct PoolManagerServiceBuilder<P, T, Event, S = NoOpSlot0Stream>
@@ -23,11 +27,11 @@ where
 {
     // Required fields
     provider:             Arc<P>,
-    angstrom_address:     Address,
-    controller_address:   Address,
+    address_book:         T::AddressBook,
     pool_manager_address: Address,
     deploy_block:         u64,
     event_stream:         Event,
+    pool_registry:        T::PoolRegistry,
 
     // Optional fields with defaults
     initial_tick_range_size:    Option<u16>,
@@ -39,8 +43,7 @@ where
     ticks_per_batch:            Option<usize>,
     reorg_detection_blocks:     Option<u64>,
     reorg_lookback_block_chunk: Option<u64>,
-    update_channel:             Option<mpsc::Sender<PoolUpdate<T>>>,
-    _phantom:                   PhantomData<T>
+    update_channel:             Option<mpsc::Sender<PoolUpdate<T>>>
 }
 
 impl<P, T, Event, Slot0> PoolManagerServiceBuilder<P, T, Event, Slot0>
@@ -52,17 +55,17 @@ where
     /// Create a new builder with required parameters including event stream
     pub fn new(
         provider: Arc<P>,
-        angstrom_address: Address,
-        controller_address: Address,
+        address_book: T::AddressBook,
+        pool_registry: T::PoolRegistry,
         pool_manager_address: Address,
         deploy_block: u64,
         event_stream: Event
     ) -> Self {
         Self {
             provider,
-            angstrom_address,
-            controller_address,
+            address_book,
             pool_manager_address,
+            pool_registry,
             deploy_block,
             event_stream,
             initial_tick_range_size: None,
@@ -74,8 +77,7 @@ where
             ticks_per_batch: None,
             reorg_detection_blocks: None,
             reorg_lookback_block_chunk: None,
-            update_channel: None,
-            _phantom: PhantomData
+            update_channel: None
         }
     }
 }
@@ -91,9 +93,9 @@ where
     ) -> PoolManagerServiceBuilder<P, Ethereum, Event, NewS> {
         PoolManagerServiceBuilder {
             provider:                   self.provider,
-            angstrom_address:           self.angstrom_address,
-            controller_address:         self.controller_address,
+            address_book:               self.address_book,
             pool_manager_address:       self.pool_manager_address,
+            pool_registry:              self.pool_registry,
             deploy_block:               self.deploy_block,
             event_stream:               self.event_stream,
             initial_tick_range_size:    self.initial_tick_range_size,
@@ -105,8 +107,7 @@ where
             ticks_per_batch:            self.ticks_per_batch,
             reorg_detection_blocks:     self.reorg_detection_blocks,
             reorg_lookback_block_chunk: self.reorg_lookback_block_chunk,
-            update_channel:             self.update_channel,
-            _phantom:                   PhantomData
+            update_channel:             self.update_channel
         }
     }
 }
@@ -114,7 +115,8 @@ where
 impl<P, T, Event, S> PoolManagerServiceBuilder<P, T, Event, S>
 where
     P: Provider<T> + Clone + 'static + Unpin,
-    T: V4Network
+    T: V4Network,
+    P: ProviderChainInitialization<T>
 {
     /// Set the initial tick range size for loading pool data
     pub fn with_initial_tick_range_size(mut self, size: u16) -> Self {
@@ -177,7 +179,8 @@ where
     where
         Event: PoolEventStream<T>,
         S: Slot0Stream + 'static,
-        DataLoader: super::pool_data_loader::PoolDataLoader
+        DataLoader<T>: PoolDataLoader<T>,
+        PoolManagerService<P, T, Event, S>: PoolEventProcessor<T>
     {
         // Use the required event stream
         let event_stream = self.event_stream;
@@ -186,8 +189,8 @@ where
         let service = PoolManagerService::new(
             self.provider.clone(),
             event_stream,
-            self.angstrom_address,
-            self.controller_address,
+            self.address_book,
+            self.pool_registry.clone(),
             self.pool_manager_address,
             self.deploy_block,
             self.initial_tick_range_size,
@@ -214,15 +217,15 @@ where
     /// Create a new builder with no-op event stream and slot0 stream
     pub fn new_with_noop_stream(
         provider: Arc<P>,
-        angstrom_address: Address,
-        controller_address: Address,
+        address_book: T::AddressBook,
+        pool_registry: T::PoolRegistry,
         pool_manager_address: Address,
         deploy_block: u64
     ) -> Self {
         let builder = PoolManagerServiceBuilder::<P, T, NoOpEventStream<T>, NoOpSlot0Stream>::new(
             provider,
-            angstrom_address,
-            controller_address,
+            address_book,
+            pool_registry,
             pool_manager_address,
             deploy_block,
             NoOpEventStream::default()
@@ -230,8 +233,8 @@ where
 
         PoolManagerServiceBuilder {
             provider:                   builder.provider,
-            angstrom_address:           builder.angstrom_address,
-            controller_address:         builder.controller_address,
+            address_book:               builder.address_book,
+            pool_registry:              builder.pool_registry,
             pool_manager_address:       builder.pool_manager_address,
             deploy_block:               builder.deploy_block,
             event_stream:               builder.event_stream,
@@ -244,8 +247,7 @@ where
             ticks_per_batch:            builder.ticks_per_batch,
             reorg_detection_blocks:     builder.reorg_detection_blocks,
             reorg_lookback_block_chunk: builder.reorg_lookback_block_chunk,
-            update_channel:             builder.update_channel,
-            _phantom:                   PhantomData
+            update_channel:             builder.update_channel
         }
     }
 }

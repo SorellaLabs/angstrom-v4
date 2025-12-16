@@ -2,8 +2,7 @@ use alloy_primitives::I256;
 use thiserror::Error;
 
 pub mod baseline_pool_factory;
-pub mod fetch_pool_keys;
-pub mod loaders;
+pub mod bindings;
 pub mod pool_data_loader;
 pub mod pool_manager_service;
 pub mod pool_manager_service_builder;
