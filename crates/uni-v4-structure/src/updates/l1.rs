@@ -78,11 +78,8 @@ impl UpdatePool<Ethereum> for L1PoolUpdate {
     }
 
     fn update_pool(&self, pool: &mut BaselinePoolState<Ethereum>) {
-        match self {
-            L1PoolUpdate::Slot0Update(update) => {
-                pool.update_slot0(update.tick, update.sqrt_price_x96.into(), update.liquidity);
-            }
-            _ => {}
+        if let L1PoolUpdate::Slot0Update(update) = self {
+            pool.update_slot0(update.tick, update.sqrt_price_x96.into(), update.liquidity);
         }
     }
 

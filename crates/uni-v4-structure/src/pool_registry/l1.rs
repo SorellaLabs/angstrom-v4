@@ -49,7 +49,7 @@ impl PoolRegistry for L1PoolRegistry {
     fn get(&self, pool_id: &PoolId) -> Option<&PoolKey> {
         let pool_key = self.uni_pools.get(pool_id);
         if pool_key.is_some() {
-            return pool_key;
+            pool_key
         } else {
             self.angstrom_registry.pools.get(pool_id)
         }
@@ -59,7 +59,7 @@ impl PoolRegistry for L1PoolRegistry {
         if let Some(addr) = hook {
             self.uni_pools
                 .iter()
-                .filter_map(|(id, key)| (key.hooks == addr).then_some((*id, key.clone())))
+                .filter_map(|(id, key)| (key.hooks == addr).then_some((*id, *key)))
                 .collect()
         } else {
             self.uni_pools.clone()

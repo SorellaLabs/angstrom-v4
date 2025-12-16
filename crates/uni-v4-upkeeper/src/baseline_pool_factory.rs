@@ -5,7 +5,7 @@ use std::{
 
 use alloy_primitives::{
     Address, U256,
-    aliases::{I24, U24}
+    aliases::I24
 };
 use alloy_provider::Provider;
 use dashmap::DashMap;
@@ -21,7 +21,7 @@ use uni_v4_structure::{
 
 use crate::{
     pool_data_loader::{DataLoader, PoolDataLoader, TickData},
-    pool_providers::{ProviderChainInitialization, update_providers::PoolUpdateError}
+    pool_providers::ProviderChainInitialization
 };
 
 pub const INITIAL_TICKS_PER_SIDE: u16 = 300;

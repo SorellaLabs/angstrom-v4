@@ -118,7 +118,7 @@ impl<T: V4Network> BaselinePoolState<T> {
 
     pub fn noop(&self) -> PoolSwapResult<'_, T> {
         PoolSwapResult {
-            fee_config:    self.fee_config.clone(),
+            fee_config:    self.fee_config,
             start_price:   self.liquidity.start_sqrt_price,
             start_tick:    self.liquidity.start_tick,
             end_price:     self.liquidity.start_sqrt_price,
@@ -144,7 +144,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: amount,
             target_price: None,
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount: None
         }
@@ -169,7 +169,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: amount,
             target_price: None,
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount
         }
@@ -190,7 +190,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: amount,
             target_price: Some(limit_price),
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount: None
         }
@@ -216,7 +216,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: amount,
             target_price: Some(limit_price),
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount
         }
@@ -252,7 +252,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: I256::MAX,
             target_price: Some(price_limit),
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount: None // Don't apply MEV tax to price discovery swap
         }
@@ -268,7 +268,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: amount,
             target_price: None,
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount
         }
@@ -291,7 +291,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: I256::MAX,
             target_price: Some(price_limit),
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount: None
         }
@@ -317,7 +317,7 @@ impl<T: V4Network> BaselinePoolState<T> {
             target_amount: I256::MAX,
             target_price: Some(price_limit),
             direction,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle,
             mev_tax_amount
         }

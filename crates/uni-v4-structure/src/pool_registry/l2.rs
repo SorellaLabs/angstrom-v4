@@ -23,7 +23,7 @@ impl PoolRegistry for L2PoolRegistry {
         if let Some(addr) = hook {
             self.pools
                 .iter()
-                .filter_map(|(id, key)| (key.hooks == addr).then_some((*id, key.clone())))
+                .filter_map(|(id, key)| (key.hooks == addr).then_some((*id, *key)))
                 .collect()
         } else {
             self.pools.clone()
@@ -90,7 +90,7 @@ impl PoolRegistry for L2PoolRegistry {
         self.pools.keys().cloned()
     }
 
-    fn angstrom_pool_id_from_uniswap_pool_id(&self, pool_id: PoolId) -> Option<PoolId> {
+    fn angstrom_pool_id_from_uniswap_pool_id(&self, _pool_id: PoolId) -> Option<PoolId> {
         None
     }
 }

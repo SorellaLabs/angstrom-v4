@@ -2,7 +2,7 @@ use alloy_primitives::keccak256;
 use alloy_sol_types::SolValue;
 use serde::{Deserialize, Serialize};
 
-use crate::{PoolId, V4Network, fee_config::FeeConfig};
+use crate::{PoolId, fee_config::FeeConfig};
 
 alloy_sol_types::sol!(
     type Currency is address;

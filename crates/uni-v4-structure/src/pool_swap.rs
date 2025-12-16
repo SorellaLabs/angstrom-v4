@@ -250,7 +250,7 @@ impl<'a, T: V4Network> PoolSwapResult<'a, T> {
             target_price: None,
             direction,
             target_amount: amount,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle: self.is_bundle,
             mev_tax_amount
         }
@@ -279,7 +279,7 @@ impl<'a, T: V4Network> PoolSwapResult<'a, T> {
             target_price: Some(price_limit),
             direction,
             target_amount: I256::MAX,
-            fee_config: self.fee_config.clone(),
+            fee_config: self.fee_config,
             is_bundle: self.is_bundle,
             mev_tax_amount: None // Don't apply MEV tax to price discovery swap
         }
