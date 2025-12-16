@@ -1,19 +1,16 @@
-pub mod pool_key;
 pub mod pools;
 
-#[allow(unused)]
-pub mod pools_impl;
-mod shared_pools;
+pub use uni_v4_structure::V4Network;
+
+// mod p;
+
 pub mod traits;
 pub mod updates;
 
 // Re-export commonly used types
-pub use pool_key::{PoolKey, PoolKeyWithFees};
-pub use pools::{PoolError, PoolId, SwapSimulationError, UniswapPools};
+pub use pools::{PoolError, SwapSimulationError, UniswapPools};
 pub use traits::{PoolUpdateDelivery, PoolUpdateDeliveryExt};
-pub use updates::{
-    ModifyLiquidityEventData, PoolUpdate, PoolUpdateQueue, Slot0Data, Slot0Update, SwapEventData
-};
+pub use uni_v4_structure::updates::{ModifyLiquidityEventData, PoolUpdate, SwapEventData};
 
 /// Configuration for what types of pool updates should be streamed
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

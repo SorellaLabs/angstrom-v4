@@ -1,16 +1,27 @@
-use alloy_primitives::{Address, I256};
+use alloy_primitives::{Address, B256, I256};
 use liquidity_base::BaselineLiquidity;
+pub use pool_key::{PoolKey, PoolKeyWithFees};
 use pool_swap::{PoolSwap, PoolSwapResult};
 use serde::{Deserialize, Serialize};
 use sqrt_pricex96::SqrtPriceX96;
+pub use updates::UpdatePool;
 
+use crate::fee_config::FeeConfig;
 pub use crate::fee_config::{
-    FeeConfiguration, L1FeeConfiguration, L2_SWAP_MEV_TAX_FACTOR, L2_SWAP_TAXED_GAS,
-    L2FeeConfiguration, calculate_l2_mev_tax
+    L1FeeConfiguration, L2_SWAP_MEV_TAX_FACTOR, L2_SWAP_TAXED_GAS, L2FeeConfiguration,
+    calculate_l2_mev_tax
 };
+pub type PoolId = B256;
 
+mod network;
+pub mod updates;
+pub use network::*;
+mod address_book;
 pub mod fee_config;
 pub mod liquidity_base;
+pub mod pool_key;
+pub use address_book::*;
+pub mod pool_registry;
 pub mod pool_swap;
 pub mod ray;
 pub mod sqrt_pricex96;
@@ -18,21 +29,21 @@ pub mod tick_info;
 
 //
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BaselinePoolState {
+pub struct BaselinePoolState<T: V4Network> {
     liquidity:           BaselineLiquidity,
     block:               u64,
-    fee_config:          FeeConfiguration,
+    fee_config:          T::FeeConfig,
     pub token0:          Address,
     pub token1:          Address,
     pub token0_decimals: u8,
     pub token1_decimals: u8
 }
 
-impl BaselinePoolState {
+impl<T: V4Network> BaselinePoolState<T> {
     pub fn new(
         liquidity: BaselineLiquidity,
         block: u64,
-        fee_config: FeeConfiguration,
+        fee_config: T::FeeConfig,
         token0: Address,
         token1: Address,
         token0_decimals: u8,
@@ -52,6 +63,10 @@ impl BaselinePoolState {
         self.liquidity.start_liquidity = start_liquidity;
     }
 
+    pub fn update_chain_specific(&mut self, update: T::PoolUpdate) {
+        update.update_pool(self);
+    }
+
     pub fn update_liquidity(&mut self, tick_lower: i32, tick_upper: i32, liquidity_delta: I256) {
         self.liquidity
             .update_liquidity_from_event(tick_lower, tick_upper, liquidity_delta);
@@ -61,7 +76,7 @@ impl BaselinePoolState {
         self.block
     }
 
-    pub fn fees_mut(&mut self) -> &mut FeeConfiguration {
+    pub fn fees_mut(&mut self) -> &mut T::FeeConfig {
         &mut self.fee_config
     }
 
@@ -81,7 +96,7 @@ impl BaselinePoolState {
         self.fee_config.protocol_fee()
     }
 
-    pub fn fee_config(&self) -> &FeeConfiguration {
+    pub fn fee_config(&self) -> &T::FeeConfig {
         &self.fee_config
     }
 
@@ -101,7 +116,7 @@ impl BaselinePoolState {
         self.liquidity.tick_spacing
     }
 
-    pub fn noop(&self) -> PoolSwapResult<'_> {
+    pub fn noop(&self) -> PoolSwapResult<'_, T> {
         PoolSwapResult {
             fee_config:    self.fee_config.clone(),
             start_price:   self.liquidity.start_sqrt_price,
@@ -121,7 +136,7 @@ impl BaselinePoolState {
         amount: I256,
         direction: bool,
         is_bundle: bool
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
 
         PoolSwap {
@@ -145,7 +160,7 @@ impl BaselinePoolState {
         direction: bool,
         is_bundle: bool,
         priority_fee_wei: Option<u128>
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
         let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
 
@@ -167,7 +182,7 @@ impl BaselinePoolState {
         direction: bool,
         is_bundle: bool,
         limit_price: SqrtPriceX96
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
 
         PoolSwap {
@@ -192,7 +207,7 @@ impl BaselinePoolState {
         is_bundle: bool,
         limit_price: SqrtPriceX96,
         priority_fee_wei: Option<u128>
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
         let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
 
@@ -215,7 +230,7 @@ impl BaselinePoolState {
         &self,
         price_limit: SqrtPriceX96,
         is_bundle: bool
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         self.swap_current_to_price_with_mev_tax(price_limit, is_bundle, None)
     }
 
@@ -227,12 +242,12 @@ impl BaselinePoolState {
         price_limit: SqrtPriceX96,
         is_bundle: bool,
         priority_fee_wei: Option<u128>
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
         let direction = liq.current_sqrt_price >= price_limit;
         let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
 
-        let price_swap = PoolSwap {
+        let price_swap: PoolSwapResult<'_, T> = PoolSwap {
             liquidity: liq,
             target_amount: I256::MAX,
             target_price: Some(price_limit),
@@ -266,7 +281,7 @@ impl BaselinePoolState {
         &self,
         price_limit: SqrtPriceX96,
         is_bundle: bool
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
 
         let direction = liq.current_sqrt_price >= price_limit;
@@ -284,13 +299,14 @@ impl BaselinePoolState {
     }
 
     /// L2 raw swap to price with MEV tax applied to token0 (ETH) delta.
-    /// Pass the priority fee (tx.gasprice - block.basefee) in wei to calculate the MEV tax.
+    /// Pass the priority fee (tx.gasprice - block.basefee) in wei to calculate
+    /// the MEV tax.
     pub fn swap_current_to_price_raw_with_mev_tax(
         &self,
         price_limit: SqrtPriceX96,
         is_bundle: bool,
         priority_fee_wei: Option<u128>
-    ) -> eyre::Result<PoolSwapResult<'_>> {
+    ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
         let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
 

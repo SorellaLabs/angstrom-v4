@@ -5,21 +5,21 @@ use alloy_primitives::Address;
 use alloy_provider::Provider;
 use futures::Stream;
 use tokio::sync::mpsc;
-use uni_v4_common::{PoolId, PoolKey, PoolUpdate};
+use uni_v4_common::{PoolUpdate, V4Network};
+use uni_v4_structure::{PoolId, PoolKey};
 
 use super::{
     pool_data_loader::DataLoader,
     pool_manager_service::{PoolManagerService, PoolManagerServiceError},
-    pool_registry::UniswapPoolRegistry,
     slot0::Slot0Stream
 };
 use crate::pool_providers::PoolEventStream;
 
 /// Builder for creating a configured PoolManagerService
-pub struct PoolManagerServiceBuilder<P, N, Event, S = NoOpSlot0Stream>
+pub struct PoolManagerServiceBuilder<P, T, Event, S = NoOpSlot0Stream>
 where
-    P: Provider<N> + Clone + 'static,
-    N: Network
+    P: Provider<T> + Clone + 'static,
+    T: V4Network
 {
     // Required fields
     provider:             Arc<P>,
@@ -39,15 +39,15 @@ where
     ticks_per_batch:            Option<usize>,
     reorg_detection_blocks:     Option<u64>,
     reorg_lookback_block_chunk: Option<u64>,
-    update_channel:             Option<mpsc::Sender<PoolUpdate>>,
-    _phantom:                   PhantomData<N>
+    update_channel:             Option<mpsc::Sender<PoolUpdate<T>>>,
+    _phantom:                   PhantomData<T>
 }
 
-impl<P, N, Event, Slot0> PoolManagerServiceBuilder<P, N, Event, Slot0>
+impl<P, T, Event, Slot0> PoolManagerServiceBuilder<P, T, Event, Slot0>
 where
-    P: Provider<N> + Clone + 'static,
-    N: Network,
-    Event: PoolEventStream
+    P: Provider<T> + Clone + 'static,
+    T: V4Network,
+    Event: PoolEventStream<T>
 {
     /// Create a new builder with required parameters including event stream
     pub fn new(
@@ -111,10 +111,10 @@ where
     }
 }
 
-impl<P, N, Event, S> PoolManagerServiceBuilder<P, N, Event, S>
+impl<P, T, Event, S> PoolManagerServiceBuilder<P, T, Event, S>
 where
-    P: Provider<N> + Clone + 'static + Unpin,
-    N: Network + Unpin
+    P: Provider<T> + Clone + 'static + Unpin,
+    T: V4Network
 {
     /// Set the initial tick range size for loading pool data
     pub fn with_initial_tick_range_size(mut self, size: u16) -> Self {
@@ -167,15 +167,15 @@ where
     /// Set the channel for sending pool updates
     /// When set, the service will send all updates via this channel instead of
     /// applying them directly
-    pub fn with_update_channel(mut self, sender: mpsc::Sender<PoolUpdate>) -> Self {
+    pub fn with_update_channel(mut self, sender: mpsc::Sender<PoolUpdate<T>>) -> Self {
         self.update_channel = Some(sender);
         self
     }
 
     /// Build the PoolManagerService with the configured options
-    pub async fn build(self) -> Result<PoolManagerService<P, N, Event, S>, PoolManagerServiceError>
+    pub async fn build(self) -> Result<PoolManagerService<P, T, Event, S>, PoolManagerServiceError>
     where
-        Event: PoolEventStream,
+        Event: PoolEventStream<T>,
         S: Slot0Stream + 'static,
         DataLoader: super::pool_data_loader::PoolDataLoader
     {
@@ -206,10 +206,10 @@ where
 }
 
 // Helper method for creating a builder with no-op streams
-impl<P, N> PoolManagerServiceBuilder<P, N, NoOpEventStream, NoOpSlot0Stream>
+impl<P, T> PoolManagerServiceBuilder<P, T, NoOpEventStream<T>, NoOpSlot0Stream>
 where
-    P: Provider<N> + Clone + 'static + Unpin,
-    N: Network + Unpin
+    P: Provider<T> + Clone + 'static + Unpin,
+    T: V4Network
 {
     /// Create a new builder with no-op event stream and slot0 stream
     pub fn new_with_noop_stream(
@@ -219,13 +219,13 @@ where
         pool_manager_address: Address,
         deploy_block: u64
     ) -> Self {
-        let builder = PoolManagerServiceBuilder::<P, N, NoOpEventStream, NoOpSlot0Stream>::new(
+        let builder = PoolManagerServiceBuilder::<P, T, NoOpEventStream<T>, NoOpSlot0Stream>::new(
             provider,
             angstrom_address,
             controller_address,
             pool_manager_address,
             deploy_block,
-            NoOpEventStream
+            NoOpEventStream::default()
         );
 
         PoolManagerServiceBuilder {
@@ -251,24 +251,24 @@ where
 }
 
 /// A no-op event stream implementation for when no event stream is needed
-pub struct NoOpEventStream;
+pub struct NoOpEventStream<T>(PhantomData<T>);
 
-impl PoolEventStream for NoOpEventStream {
+impl<T: V4Network> PoolEventStream<T> for NoOpEventStream<T> {
     fn start_tracking_pool(&mut self, _pool_id: PoolId) {}
 
     fn stop_tracking_pool(&mut self, _pool_id: PoolId) {}
 
-    fn set_pool_registry(&mut self, _pool_registry: UniswapPoolRegistry) {}
+    fn set_pool_registry(&mut self, _pool_registry: T::PoolRegistry) {}
 }
 
-impl Default for NoOpEventStream {
+impl<T: V4Network> Default for NoOpEventStream<T> {
     fn default() -> Self {
-        Self
+        Self(PhantomData)
     }
 }
 
-impl Stream for NoOpEventStream {
-    type Item = Vec<uni_v4_common::PoolUpdate>;
+impl<T: V4Network> Stream for NoOpEventStream<T> {
+    type Item = Vec<PoolUpdate<T>>;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,

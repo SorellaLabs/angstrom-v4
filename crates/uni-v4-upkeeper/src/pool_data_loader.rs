@@ -5,16 +5,13 @@ use alloy_primitives::{Address, B256, BlockNumber, I256, Log, U256, aliases::I24
 use alloy_provider::Provider;
 use alloy_sol_types::{SolEvent, SolType, sol};
 use itertools::Itertools;
-use uni_v4_common::{PoolError, PoolId as AngstromPoolId, PoolKey};
-use uni_v4_structure::{ray::Ray, sqrt_pricex96::SqrtPriceX96};
+use uni_v4_common::PoolError;
+use uni_v4_structure::{PoolId as AngstromPoolId, PoolKey, ray::Ray, sqrt_pricex96::SqrtPriceX96};
 use uniswap_v3_math::tick_math::{MAX_TICK, MIN_TICK};
 
-use super::{
-    loaders::{
-        get_uniswap_v_4_pool_data::GetUniswapV4PoolData,
-        get_uniswap_v_4_tick_data::GetUniswapV4TickData
-    },
-    pool_registry::UniswapPoolRegistry
+use super::loaders::{
+    get_uniswap_v_4_pool_data::GetUniswapV4PoolData,
+    get_uniswap_v_4_tick_data::GetUniswapV4TickData
 };
 use crate::i128_to_i256;
 

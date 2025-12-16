@@ -10,17 +10,16 @@ use tokio::sync::{
     Notify,
     futures::{Notified, OwnedNotified}
 };
-use uni_v4_structure::BaselinePoolState;
+use uni_v4_structure::{
+    BaselinePoolState, V4Network, fee_config::FeeConfig, UpdatePool
+};
 use uniswap_v3_math::error::UniswapV3MathError;
 
-use crate::{
-    traits::{PoolUpdateDelivery, PoolUpdateDeliveryExt},
-    updates::PoolUpdate
-};
+use crate::traits::{PoolUpdateDelivery, PoolUpdateDeliveryExt};
 
 #[derive(Clone)]
-pub struct UniswapPools {
-    pools:           Arc<DashMap<PoolId, BaselinePoolState>>,
+pub struct UniswapPools<T: V4Network> {
+    pools:           Arc<DashMap<PoolId, BaselinePoolState<T>>>,
     slot0_notifiers: Arc<DashMap<PoolId, Arc<Notify>>>,
     // what block these are up to date for.
     block_number:    Arc<AtomicU64>,
@@ -29,16 +28,16 @@ pub struct UniswapPools {
     notifier:        Arc<Notify>
 }
 
-impl Deref for UniswapPools {
-    type Target = Arc<DashMap<PoolId, BaselinePoolState>>;
+impl<T: V4Network> Deref for UniswapPools<T> {
+    type Target = Arc<DashMap<PoolId, BaselinePoolState<T>>>;
 
     fn deref(&self) -> &Self::Target {
         &self.pools
     }
 }
 
-impl UniswapPools {
-    pub fn new(pools: Arc<DashMap<PoolId, BaselinePoolState>>, block_number: u64) -> Self {
+impl<T: V4Network> UniswapPools<T> {
+    pub fn new(pools: Arc<DashMap<PoolId, BaselinePoolState<T>>>, block_number: u64) -> Self {
         Self {
             slot0_notifiers: Arc::new(
                 pools
@@ -68,11 +67,11 @@ impl UniswapPools {
         self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
     }
 
-    pub fn get_pool(&self, pool_id: &PoolId) -> Option<Ref<'_, PoolId, BaselinePoolState>> {
+    pub fn get_pool(&self, pool_id: &PoolId) -> Option<Ref<'_, PoolId, BaselinePoolState<T>>> {
         self.pools.get(pool_id)
     }
 
-    pub fn get_pools(&self) -> &DashMap<PoolId, BaselinePoolState> {
+    pub fn get_pools(&self) -> &DashMap<PoolId, BaselinePoolState<T>> {
         &self.pools
     }
 
@@ -92,7 +91,7 @@ impl UniswapPools {
             .notified_owned()
     }
 
-    pub fn update_pools(&self, mut updates: Vec<PoolUpdate>) {
+    pub fn update_pools(&self, mut updates: Vec<PoolUpdate<T>>) {
         if updates.is_empty() {
             return;
         }
@@ -132,24 +131,24 @@ impl UniswapPools {
                         event.liquidity_delta
                     );
                 }
-                PoolUpdate::FeeUpdate { pool_id, bundle_fee, swap_fee, protocol_fee, .. } => {
+                PoolUpdate::FeeUpdate { pool_id, update, .. } => {
                     let Some(mut pool) = self.pools.get_mut(&pool_id) else {
                         continue;
                     };
                     let fees = pool.value_mut().fees_mut();
 
-                    fees.update_l1_fees(Some(bundle_fee), Some(swap_fee), Some(protocol_fee));
+                    fees.update_fees(update);
                 }
-                PoolUpdate::UpdatedSlot0 { pool_id, data } => {
-                    let Some(mut pool) = self.pools.get_mut(&pool_id) else {
-                        continue;
-                    };
+                // PoolUpdate::UpdatedSlot0 { pool_id, data } => {
+                //     let Some(mut pool) = self.pools.get_mut(&pool_id) else {
+                //         continue;
+                //     };
 
-                    let state = pool.value_mut();
-                    state.update_slot0(data.tick, data.sqrt_price_x96.into(), data.liquidity);
+                //     let state = pool.value_mut();
+                //     state.update_slot0(data.tick, data.sqrt_price_x96.into(), data.liquidity);
 
-                    self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
-                }
+                //     self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
+                // }
                 PoolUpdate::NewTicks { pool_id, ticks, tick_bitmap } => {
                     let Some(mut pool) = self.pools.get_mut(&pool_id) else {
                         continue;
@@ -170,26 +169,40 @@ impl UniswapPools {
                     self.slot0_notifiers
                         .insert(pool_id, Arc::new(Notify::new()));
                 }
-                PoolUpdate::Slot0Update(update) => {
-                    if update.current_block != current_block_number {
-                        continue;
-                    }
+                // PoolUpdate::Slot0Update(update) => {
+                //     if update.current_block != current_block_number {
+                //         continue;
+                //     }
 
-                    let Some(mut pool) = self.pools.get_mut(&update.angstrom_pool_id) else {
+                //     let Some(mut pool) = self.pools.get_mut(&update.angstrom_pool_id) else {
+                //         continue;
+                //     };
+
+                //     pool.value_mut().update_slot0(
+                //         update.tick,
+                //         update.sqrt_price_x96.into(),
+                //         update.liquidity
+                //     );
+
+                //     self.slot0_notifiers
+                //         .get(&update.angstrom_pool_id)
+                //         .unwrap()
+                //         .notify_waiters();
+                // }
+                PoolUpdate::ChainSpecific { pool_id, update } => {
+                    let Some(mut pool) = self.pools.get_mut(&pool_id) else {
                         continue;
                     };
 
-                    pool.value_mut().update_slot0(
-                        update.tick,
-                        update.sqrt_price_x96.into(),
-                        update.liquidity
-                    );
+                    let should_notify = update.should_notify_waiters();
 
-                    self.slot0_notifiers
-                        .get(&update.angstrom_pool_id)
-                        .unwrap()
-                        .notify_waiters();
+                    pool.update_chain_specific(update);
+
+                    if should_notify {
+                        self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
+                    }
                 }
+
                 _ => {}
             }
         }
@@ -203,7 +216,7 @@ impl UniswapPools {
 
     /// Update pools using a PoolUpdateDelivery source
     /// Processes all available updates from the source
-    pub fn update_from_source<T: PoolUpdateDelivery>(&self, source: &mut T) {
+    pub fn update_from_source<D: PoolUpdateDelivery<T>>(&self, source: &mut D) {
         let mut updates = Vec::new();
 
         // Collect all available updates using the extension trait
@@ -218,7 +231,7 @@ impl UniswapPools {
     /// Update pools by processing a single update from a PoolUpdateDelivery
     /// source Returns true if an update was processed, false if no updates
     /// were available
-    pub fn update_single_from_source<T: PoolUpdateDelivery>(&self, source: &mut T) -> bool {
+    pub fn update_single_from_source<D: PoolUpdateDelivery<T>>(&self, source: &mut D) -> bool {
         if let Some(update) = source.next_update() {
             self.update_pools(vec![update]);
             true

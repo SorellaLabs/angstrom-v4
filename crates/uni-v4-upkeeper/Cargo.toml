@@ -27,6 +27,7 @@ itertools.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+op-alloy-network.workspace = true
 tracing.workspace = true
 uniswap_v3_math.workspace = true
 

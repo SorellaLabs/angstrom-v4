@@ -13,11 +13,13 @@ use alloy_provider::Provider;
 use dashmap::DashMap;
 use futures::{Stream, StreamExt, future::BoxFuture, stream::FuturesUnordered};
 use thiserror::Error;
-use uni_v4_common::{PoolId, PoolKey};
-use uni_v4_structure::{BaselinePoolState, liquidity_base::BaselineLiquidity, tick_info::TickInfo};
+use uni_v4_common::V4Network;
+use uni_v4_structure::{
+    BaselinePoolState, PoolId, PoolKey, liquidity_base::BaselineLiquidity, tick_info::TickInfo
+};
 
 use super::pool_data_loader::{DataLoader, PoolDataLoader, TickData};
-use crate::{fetch_pool_keys::fetch_angstrom_pools, pool_registry::UniswapPoolRegistry};
+use crate::fetch_pool_keys::fetch_angstrom_pools;
 
 pub const INITIAL_TICKS_PER_SIDE: u16 = 300;
 const DEFAULT_TICKS_PER_BATCH: usize = 10;
@@ -32,15 +34,15 @@ pub enum BaselinePoolFactoryError {
     Initialization(String)
 }
 
-pub enum UpdateMessage {
+pub enum UpdateMessage<T: V4Network> {
     NewTicks(PoolId, HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>),
-    NewPool(PoolId, BaselinePoolState)
+    NewPool(PoolId, BaselinePoolState<T>)
 }
 
 /// Factory for creating BaselinePoolState instances with full tick loading
-pub struct BaselinePoolFactory<P, N> {
+pub struct BaselinePoolFactory<P: Provider<T>, T: V4Network> {
     provider:            Arc<P>,
-    registry:            UniswapPoolRegistry,
+    registry:            T::PoolRegistry,
     pool_manager:        Address,
     tick_band:           u16,
     tick_edge_threshold: u16,
@@ -49,15 +51,14 @@ pub struct BaselinePoolFactory<P, N> {
         BoxFuture<'static, (PoolId, HashMap<i32, TickInfo>, HashMap<i16, alloy_primitives::U256>)>
     >,
     pool_generator: FuturesUnordered<
-        BoxFuture<'static, Result<(PoolId, BaselinePoolState), BaselinePoolFactoryError>>
-    >,
-    _phantom:            PhantomData<N>
+        BoxFuture<'static, Result<(PoolId, BaselinePoolState<T>), BaselinePoolFactoryError>>
+    >
 }
 
-impl<P, N> BaselinePoolFactory<P, N>
+impl<P, T> BaselinePoolFactory<P, T>
 where
-    P: Provider<N> + 'static,
-    N: Network,
+    P: Provider<T> + 'static,
+    T: V4Network,
     DataLoader: PoolDataLoader
 {
     #[allow(clippy::too_many_arguments)]
@@ -71,7 +72,7 @@ where
         tick_edge_threshold: Option<u16>,
         filter_pool_keys: Option<HashSet<PoolKey>>,
         ticks_per_batch: Option<usize>
-    ) -> (Self, Arc<DashMap<PoolId, BaselinePoolState>>) {
+    ) -> (Self, Arc<DashMap<PoolId, BaselinePoolState<T>>>) {
         // Fetch all existing pool keys to get their fees
         let all_pool_keys_with_fees = fetch_angstrom_pools(
             deploy_block as usize,
@@ -95,8 +96,7 @@ where
             tick_edge_threshold: tick_edge_threshold.unwrap_or(100),
             ticks_per_batch: ticks_per_batch.unwrap_or(DEFAULT_TICKS_PER_BATCH),
             tick_loading: FuturesUnordered::default(),
-            pool_generator: FuturesUnordered::default(),
-            _phantom: PhantomData
+            pool_generator: FuturesUnordered::default()
         };
 
         let pools = DashMap::new();
@@ -138,7 +138,7 @@ where
         !(self.tick_loading.is_empty() || self.pool_generator.is_empty())
     }
 
-    pub fn registry(&self) -> UniswapPoolRegistry {
+    pub fn registry(&self) -> T::PoolRegistry {
         self.registry.clone()
     }
 
@@ -155,7 +155,7 @@ where
         bundle_fee: u32,
         swap_fee: u32,
         protocol_fee: u32
-    ) -> Result<BaselinePoolState, BaselinePoolFactoryError> {
+    ) -> Result<BaselinePoolState<T>, BaselinePoolFactoryError> {
         // Add to registry
         let pub_key = PoolId::from(pool_key);
         self.registry.pools.insert(pub_key, pool_key);
@@ -197,7 +197,7 @@ where
         bundle_fee: u32,
         swap_fee: u32,
         protocol_fee: u32
-    ) -> Result<BaselinePoolState, BaselinePoolFactoryError> {
+    ) -> Result<BaselinePoolState<T>, BaselinePoolFactoryError> {
         // Create data loader
         let data_loader = DataLoader::new_with_registry(
             internal_pool_id,
@@ -814,7 +814,7 @@ where
     pub fn check_and_request_ticks_if_needed(
         &mut self,
         pool_id: PoolId,
-        pool_state: &BaselinePoolState,
+        pool_state: &BaselinePoolState<T>,
         block_number: Option<u64>
     ) -> bool {
         let baseline = pool_state.get_baseline_liquidity();
@@ -889,10 +889,8 @@ where
     }
 }
 
-impl<P: Provider<N> + Clone + Unpin + 'static, N: Network + Unpin> Stream
-    for BaselinePoolFactory<P, N>
-{
-    type Item = UpdateMessage;
+impl<P: Provider<T> + Clone + Unpin + 'static, T: V4Network> Stream for BaselinePoolFactory<P, T> {
+    type Item = UpdateMessage<T>;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,

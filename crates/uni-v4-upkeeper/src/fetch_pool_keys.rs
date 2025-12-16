@@ -6,7 +6,7 @@ use alloy_provider::Provider;
 use alloy_rpc_types::Filter;
 use alloy_sol_types::SolEvent;
 use futures::StreamExt;
-use uni_v4_common::{PoolKey, PoolKeyWithFees};
+use uni_v4_structure::{PoolKey, PoolKeyWithFees};
 
 /// Controller V1 address - this could be made configurable
 static CONTROLLER_V1_ADDRESS: OnceLock<Address> = OnceLock::new();

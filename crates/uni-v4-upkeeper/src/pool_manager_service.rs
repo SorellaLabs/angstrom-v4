@@ -5,14 +5,13 @@ use std::{
     task::{Context, Poll}
 };
 
-use alloy_network::Network;
 use alloy_primitives::Address;
 use alloy_provider::Provider;
 use futures::{Future, Stream, StreamExt};
 use thiserror::Error;
 use tokio::sync::mpsc;
-use uni_v4_common::{PoolId, PoolKey, PoolUpdate, UniswapPools};
-use uni_v4_structure::BaselinePoolState;
+use uni_v4_common::{PoolUpdate, UniswapPools, V4Network};
+use uni_v4_structure::{BaselinePoolState, PoolId, PoolKey};
 
 use super::{
     baseline_pool_factory::{BaselinePoolFactory, BaselinePoolFactoryError, UpdateMessage},
@@ -22,8 +21,8 @@ use crate::{pool_providers::PoolEventStream, slot0::Slot0Stream};
 
 /// Pool information combining BaselinePoolState with token metadata
 #[derive(Debug, Clone)]
-pub struct PoolInfo {
-    pub baseline_state:  BaselinePoolState,
+pub struct PoolInfo<T: V4Network> {
+    pub baseline_state:  BaselinePoolState<T>,
     pub token0:          Address,
     pub token1:          Address,
     pub token0_decimals: u8,
@@ -44,31 +43,31 @@ pub enum PoolManagerServiceError {
 
 /// Service for managing Uniswap V4 pools with real-time block subscription
 /// updates
-pub struct PoolManagerService<P, N, Event, S = ()>
+pub struct PoolManagerService<P, T, Event, S = ()>
 where
-    P: Provider<N> + Unpin + Clone + 'static,
-    N: Network,
-    Event: PoolEventStream
+    P: Provider<T> + Unpin + Clone + 'static,
+    T: V4Network,
+    Event: PoolEventStream<T>
 {
-    pub(crate) factory:            BaselinePoolFactory<P, N>,
+    pub(crate) factory:            BaselinePoolFactory<P, T>,
     pub(crate) event_stream:       Event,
-    pub(crate) pools:              UniswapPools,
+    pub(crate) pools:              UniswapPools<T>,
     pub(crate) current_block:      u64,
     pub(crate) auto_pool_creation: bool,
     pub(crate) slot0_stream:       Option<S>,
     // If we are loading more ticks at a block, we will queue up updates messages here
     // so that we don't hit any race conditions.
-    pending_updates:               Vec<PoolUpdate>,
+    pending_updates:               Vec<PoolUpdate<T>>,
     // Channel for sending updates instead of applying them directly
-    update_sender:                 Option<mpsc::Sender<PoolUpdate>>
+    update_sender:                 Option<mpsc::Sender<PoolUpdate<T>>>
 }
 
-impl<P, N, Event, S> PoolManagerService<P, N, Event, S>
+impl<P, T, Event, S> PoolManagerService<P, T, Event, S>
 where
-    P: Provider<N> + Clone + Unpin + 'static,
-    N: Network,
-    Event: PoolEventStream,
-    BaselinePoolFactory<P, N>: Stream<Item = UpdateMessage> + Unpin,
+    P: Provider<T> + Clone + Unpin + 'static,
+    T: V4Network,
+    Event: PoolEventStream<T>,
+    BaselinePoolFactory<P, T>: Stream<Item = UpdateMessage> + Unpin,
     S: Slot0Stream
 {
     /// Create a new PoolManagerService
@@ -87,7 +86,7 @@ where
         slot0_stream: Option<S>,
         current_block: Option<u64>,
         ticks_per_batch: Option<usize>,
-        update_channel: Option<mpsc::Sender<PoolUpdate>>
+        update_channel: Option<mpsc::Sender<PoolUpdate<T>>>
     ) -> Result<Self, PoolManagerServiceError> {
         // Set the controller address for the fetch_pool_keys module
         set_controller_address(controller_address);
@@ -142,7 +141,7 @@ where
 
         // Send all initialized pools through the channel on startup
         if service.update_sender.is_some() {
-            let initial_pool_updates: Vec<PoolUpdate> = service
+            let initial_pool_updates: Vec<PoolUpdate<T>> = service
                 .pools
                 .get_pools()
                 .iter()
@@ -161,7 +160,7 @@ where
     }
 
     /// Get all currently tracked pools
-    pub fn get_pools(&self) -> UniswapPools {
+    pub fn get_pools(&self) -> UniswapPools<T> {
         self.pools.clone()
     }
 
@@ -199,7 +198,7 @@ where
     }
 
     /// Dispatch an update either via channel or apply directly
-    fn dispatch_update(&mut self, update: PoolUpdate) {
+    fn dispatch_update(&mut self, update: PoolUpdate<T>) {
         if let Some(sender) = &self.update_sender {
             // Channel mode: send the update
             if let Err(e) = sender.try_send(update.clone()) {
@@ -233,7 +232,7 @@ where
     }
 
     /// Process a pool update event from the PoolUpdateProvider
-    pub fn process_pool_update(&mut self, update: PoolUpdate) {
+    pub fn process_pool_update(&mut self, update: PoolUpdate<T>) {
         match &update {
             PoolUpdate::NewBlock(block_number) => {
                 self.current_block = *block_number;
@@ -298,7 +297,7 @@ where
             PoolUpdate::FeeUpdate { pool_id, bundle_fee, swap_fee, protocol_fee, .. } => {
                 if let Some(mut pool) = self.pools.get_pools().get_mut(pool_id) {
                     let fees = pool.fees_mut();
-                    fees.update_l1_fees(Some(*bundle_fee), Some(*swap_fee), Some(*protocol_fee));
+                    fees.update_fees(Some(*bundle_fee), Some(*swap_fee), Some(*protocol_fee));
 
                     tracing::info!(
                         "Updated fees for pool {:?}: bundle_fee: {}, swap_fee: {}, protocol_fee: \
@@ -341,12 +340,12 @@ where
     }
 }
 
-impl<P, N, Event, S> Future for PoolManagerService<P, N, Event, S>
+impl<P, T, Event, S> Future for PoolManagerService<P, T, Event, S>
 where
-    P: Provider<N> + Clone + Unpin + 'static,
-    N: Network + Unpin,
-    Event: PoolEventStream,
-    BaselinePoolFactory<P, N>: Stream<Item = UpdateMessage> + Unpin,
+    P: Provider<T> + Clone + Unpin + 'static,
+    T: V4Network,
+    Event: PoolEventStream<T>,
+    BaselinePoolFactory<P, T>: Stream<Item = UpdateMessage> + Unpin,
     S: Slot0Stream
 {
     type Output = ();
