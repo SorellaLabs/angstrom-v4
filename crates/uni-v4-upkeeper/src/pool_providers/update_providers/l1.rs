@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use alloy_consensus::Transaction;
 use alloy_eips::BlockId;
@@ -315,7 +315,7 @@ where
         .collect::<Vec<_>>();
 
     logs.into_iter()
-        .fold(HashSet::new(), |mut set, log| {
+        .fold(HashMap::new(), |mut set, log| {
             if let Ok(pool) =
                 types::ControllerV1::PoolConfigured::decode_log(&log.clone().into_inner())
             {
@@ -334,35 +334,29 @@ where
                     }
                 };
 
-                set.insert(pool_key_with_fees);
+                let mut raw = pool_key_with_fees.pool_key.clone();
+                raw.fee = Default::default();
+
+                set.insert(raw, pool_key_with_fees);
                 return set;
             }
 
             if let Ok(pool) =
                 types::ControllerV1::PoolRemoved::decode_log(&log.clone().into_inner())
             {
-                // For removal, we need to match by pool key, so we create a dummy with default
-                // fees
-                let pool_key_with_fees = PoolKeyWithFees {
-                    pool_key: PoolKey {
-                        currency0:   pool.asset0,
-                        currency1:   pool.asset1,
-                        fee:         pool.feeInE6,
-                        tickSpacing: pool.tickSpacing,
-                        hooks:       angstrom_address
-                    },
-                    fee_cfg:  L1FeeConfiguration {
-                        bundle_fee:   0,
-                        swap_fee:     0,
-                        protocol_fee: 0
-                    }
+                let remove_key = PoolKey {
+                    currency0:   pool.asset0,
+                    currency1:   pool.asset1,
+                    fee:         Default::default(),
+                    tickSpacing: pool.tickSpacing,
+                    hooks:       angstrom_address
                 };
-
-                set.retain(|p| p.pool_key != pool_key_with_fees.pool_key);
+                set.remove(&remove_key);
                 return set;
             }
             set
         })
         .into_iter()
+        .map(|(_, key)| key)
         .collect::<Vec<_>>()
 }
