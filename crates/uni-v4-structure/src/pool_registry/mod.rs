@@ -5,7 +5,6 @@ use alloy_primitives::Address;
 use crate::{PoolId, PoolKey};
 pub mod l1;
 pub mod l2;
-mod old;
 
 pub trait PoolRegistry: Clone + Send + Sync + Unpin + Debug {
     type PoolIdSet: UniswapPoolIdSet;
