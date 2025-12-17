@@ -27,12 +27,12 @@ pub trait ProviderChainUpdate<T: V4Network> {
 }
 
 pub trait ProviderChainInitialization<T: V4Network>: Provider<T> {
-    async fn fetch_pools(
+    fn fetch_pools(
         &self,
         address_book: T::AddressBook,
         start_block: u64,
         end_block: u64
-    ) -> Result<Vec<PoolKeyWithFees<T::FeeConfig>>, PoolUpdateError>;
+    ) -> impl Future<Output = Result<Vec<PoolKeyWithFees<T::FeeConfig>>, PoolUpdateError>> + Send;
 }
 
 impl<P> ProviderChainInitialization<Ethereum> for P

@@ -1,20 +1,13 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
-use alloy::{
-    primitives::address,
-    providers::{Provider, ProviderBuilder}
-};
-use alloy_primitives::{I256, U160};
-use angstrom_v4::{PoolId, sqrt_pricex96::SqrtPriceX96};
-use futures::StreamExt;
+use alloy_primitives::{address, I256, U160};
+use alloy_provider::ProviderBuilder;
+use alloy_network::Ethereum;
 use jsonrpsee::ws_client::WsClientBuilder;
+use uniswap_v3_math::sqrt_price::SqrtPriceX96;
+use uni_v4_structure::{PoolId, pool_registry::l1::L1PoolRegistry, L1AddressBook};
 use uni_v4_upkeeper::{
-    pool_manager_service_builder::PoolManagerServiceBuilder,
-    pool_providers::{
-        completed_block_stream::CompletedBlockStream,
-        pool_update_provider::{PoolUpdateProvider, StateStream}
-    },
-    pool_registry::l1::L1PoolRegistry,
+    pool_manager_service_builder::{PoolManagerServiceBuilder, NoOpEventStream},
     slot0::{NoOpSlot0Stream, Slot0Client}
 };
 
@@ -49,49 +42,18 @@ async fn main() -> eyre::Result<()> {
     let ws_client = Arc::new(WsClientBuilder::default().build(&ws_url).await?);
     let slot0_client = Slot0Client::new(ws_client);
 
-    // Set up event stream for block-based updates
-    println!("📡 Setting up event stream...");
-    let pool_registry = L1PoolRegistry::default();
-    let update_provider = PoolUpdateProvider::new(
-        provider.clone(),
-        pool_manager_address,
-        controller_address,
-        angstrom_address,
-        pool_registry
-    )
-    .await;
-
-    let block = provider.get_block_number().await.unwrap();
-    let prev_block_hash = provider
-        .get_block_by_number(block.into())
-        .hashes()
-        .await
-        .unwrap()
-        .unwrap()
-        .hash();
-
-    let block_stream = provider
-        .subscribe_full_blocks()
-        .full()
-        .channel_size(10)
-        .into_stream()
-        .await
-        .unwrap();
-
-    let block_stream = CompletedBlockStream::new(
-        prev_block_hash,
-        block,
-        provider.clone(),
-        block_stream.map(|block| block.unwrap()).boxed()
-    );
-    let event_stream = StateStream::new(update_provider, block_stream);
+    // Set up address book and pool registry
+    println!("📡 Setting up address book and pool registry...");
+    let address_book = L1AddressBook::new(controller_address, angstrom_address);
+    let pool_registry = L1PoolRegistry::new(angstrom_address);
+    let event_stream = NoOpEventStream::<Ethereum>::default();
 
     // Create pool manager service with both event stream and slot0 stream
     println!("🔨 Building pool manager service with slot0 stream...");
     let service = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
-        angstrom_address,
-        controller_address,
+        address_book,
+        pool_registry,
         pool_manager_address,
         deploy_block,
         event_stream

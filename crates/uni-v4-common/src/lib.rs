@@ -2,10 +2,8 @@ pub mod pools;
 
 pub use uni_v4_structure::V4Network;
 
-// mod p;
-
+pub mod pool_update;
 pub mod traits;
-pub mod updates;
 
 // Re-export commonly used types
 pub use pools::{PoolError, SwapSimulationError, UniswapPools};

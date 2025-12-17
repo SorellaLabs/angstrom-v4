@@ -4251,7 +4251,9 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uni-v4-common",
+ "uni-v4-structure",
  "uni-v4-upkeeper",
+ "uniswap_v3_math",
 ]
 
 [[package]]

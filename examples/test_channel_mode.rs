@@ -6,6 +6,7 @@ use alloy_provider::ProviderBuilder;
 use eyre::Result;
 use tokio::sync::mpsc;
 use uni_v4_common::PoolUpdate;
+use uni_v4_structure::{L1AddressBook, pool_registry::l1::L1PoolRegistry};
 use uni_v4_upkeeper::pool_manager_service_builder::{
     NoOpEventStream, NoOpSlot0Stream, PoolManagerServiceBuilder
 };
@@ -27,17 +28,21 @@ async fn main() -> Result<()> {
     let deploy_block = 1;
 
     // Create channel for receiving pool updates
-    let (tx, mut rx) = mpsc::channel::<PoolUpdate>(100);
+    let (tx, mut rx) = mpsc::channel::<PoolUpdate<Ethereum>>(100);
 
     // Build service with channel mode
     println!("🔧 Building pool manager service with channel mode...");
-    let service = PoolManagerServiceBuilder::<_, _, NoOpEventStream, NoOpSlot0Stream>::new(
+    // Create address book and registry
+    let address_book = L1AddressBook::new(controller_address, angstrom_address);
+    let pool_registry = L1PoolRegistry::new(angstrom_address);
+
+    let service = PoolManagerServiceBuilder::<_, _, NoOpEventStream<Ethereum>, NoOpSlot0Stream>::new(
         provider.clone(),
-        angstrom_address,
-        controller_address,
+        address_book,
+        pool_registry,
         pool_manager_address,
         deploy_block,
-        NoOpEventStream
+        NoOpEventStream::<Ethereum>::default()
     )
     .with_update_channel(tx)
     .build()
@@ -59,8 +64,8 @@ async fn main() -> Result<()> {
                 PoolUpdate::NewBlock(block) => {
                     println!("  ✅ Received NewBlock #{block}");
                 }
-                PoolUpdate::NewPool { pool_id, .. } => {
-                    println!("  ✅ Received NewPool for {pool_id:?}");
+                PoolUpdate::ChainSpecific { pool_id, update } => {
+                    println!("  ✅ Received ChainSpecific update for {pool_id:?}: {:?}", update);
                 }
                 PoolUpdate::NewTicks { pool_id, ticks, .. } => {
                     println!("  ✅ Received NewTicks for {:?} ({} ticks)", pool_id, ticks.len());

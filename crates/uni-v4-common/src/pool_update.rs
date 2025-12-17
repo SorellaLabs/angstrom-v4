@@ -77,46 +77,6 @@ impl<T: V4Network> PoolUpdateDelivery<T> for PoolUpdateQueue<T> {
         }
     }
 
-    // fn get_new_pool(&mut self) -> Option<(PoolId, Address, Address, u32, u32,
-    // u32, i32, u64)> {     match self.updates.front() {
-    //         Some(PoolUpdate::NewPool {
-    //             pool_id,
-    //             token0,
-    //             token1,
-    //             bundle_fee,
-    //             swap_fee,
-    //             protocol_fee,
-    //             tick_spacing,
-    //             block
-    //         }) => {
-    //             let result = (
-    //                 *pool_id,
-    //                 *token0,
-    //                 *token1,
-    //                 *bundle_fee,
-    //                 *swap_fee,
-    //                 *protocol_fee,
-    //                 *tick_spacing,
-    //                 *block
-    //             );
-    //             self.updates.pop_front();
-    //             Some(result)
-    //         }
-    //         _ => None
-    //     }
-    // }
-
-    // fn get_pool_removal(&mut self) -> Option<(PoolId, u64)> {
-    //     match self.updates.front() {
-    //         Some(PoolUpdate::PoolRemoved { pool_id, block }) => {
-    //             let result = (*pool_id, *block);
-    //             self.updates.pop_front();
-    //             Some(result)
-    //         }
-    //         _ => None
-    //     }
-    // }
-
     fn get_swap_event(&mut self) -> Option<(PoolId, u64, u64, u64, SwapEventData)> {
         match self.updates.front() {
             Some(PoolUpdate::SwapEvent { pool_id, block, tx_index, log_index, event }) => {
@@ -194,17 +154,6 @@ impl<T: V4Network> PoolUpdateDelivery<T> for PoolUpdateQueue<T> {
             _ => None
         }
     }
-
-    // fn get_slot0_stream_update(&mut self) -> Option<Slot0Update> {
-    //     match self.updates.front() {
-    //         Some(PoolUpdate::Slot0Update(update)) => {
-    //             let update = update.clone();
-    //             self.updates.pop_front();
-    //             Some(update)
-    //         }
-    //         _ => None
-    //     }
-    // }
 
     fn get_chain_specific_update(&mut self) -> Option<(PoolId, T::PoolUpdate)> {
         match self.updates.front() {
