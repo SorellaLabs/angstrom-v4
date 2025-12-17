@@ -1,6 +1,6 @@
 use std::{collections::HashSet, marker::PhantomData, sync::Arc};
 
-use alloy_network::{Ethereum, Network};
+use alloy_network::Ethereum;
 use alloy_primitives::Address;
 use alloy_provider::Provider;
 use futures::Stream;

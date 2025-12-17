@@ -207,8 +207,6 @@ impl<T: V4Network> UniswapPools<T> {
                         self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
                     }
                 }
-
-                _ => {}
             }
         }
 

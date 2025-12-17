@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use alloy_primitives::{Address, U256};
+use alloy_primitives::U256;
 use uni_v4_structure::{
     BaselinePoolState, PoolId,
     fee_config::FeeConfig,
@@ -23,13 +23,13 @@ pub trait PoolUpdateDelivery<T: V4Network>: Send + Sync {
     /// Returns: (from_block, to_block)
     fn get_reorg(&mut self) -> Option<(u64, u64)>;
 
-    /// Get a new pool creation event
-    /// Returns: (pool_id, token0, token1, bundle_fee, swap_fee, protocol_fee,
-    /// tick_spacing, block)
+    // /// Get a new pool creation event
+    // /// Returns: (pool_id, token0, token1, bundle_fee, swap_fee, protocol_fee,
+    // /// tick_spacing, block)
     // fn get_new_pool(&mut self) -> Option<(PoolId, Address, Address, u32, u32, u32, i32, u64)>;
 
-    /// Get a pool removal event
-    /// Returns: (pool_id, block)
+    // /// Get a pool removal event
+    // /// Returns: (pool_id, block)
     // fn get_pool_removal(&mut self) -> Option<(PoolId, u64)>;
 
     /// Get a swap event
@@ -56,7 +56,7 @@ pub trait PoolUpdateDelivery<T: V4Network>: Send + Sync {
     /// Returns: (pool_id, state)
     fn get_new_pool_state(&mut self) -> Option<(PoolId, BaselinePoolState<T>)>;
 
-    /// Get a slot0 streaming update
+    // /// Get a slot0 streaming update
     // fn get_slot0_stream_update(&mut self) -> Option<Slot0Update>;
 
     /// Get chain specific update

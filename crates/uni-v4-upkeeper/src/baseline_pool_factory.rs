@@ -46,7 +46,7 @@ pub enum UpdateMessage<T: V4Network> {
 pub struct BaselinePoolFactory<P: Provider<T>, T: V4Network> {
     provider:            Arc<P>,
     registry:            T::PoolRegistry,
-    address_book:        T::AddressBook,
+    _address_book:       T::AddressBook,
     pool_manager:        Address,
     tick_band:           u16,
     tick_edge_threshold: u16,
@@ -93,7 +93,7 @@ where
             provider,
             registry,
             pool_manager,
-            address_book,
+            _address_book: address_book,
             tick_band: tick_band.unwrap_or(INITIAL_TICKS_PER_SIDE),
             tick_edge_threshold: tick_edge_threshold.unwrap_or(100),
             ticks_per_batch: ticks_per_batch.unwrap_or(DEFAULT_TICKS_PER_BATCH),
@@ -553,7 +553,7 @@ where
     //     self.registry.pools.values().cloned().collect()
     // }
 
-    /// Get conversion map from registry
+    // /// Get conversion map from registry
     // pub fn conversion_map(&self) -> &HashMap<PoolId, PoolId> {
     //     &self.registry.conversion_map
     // }

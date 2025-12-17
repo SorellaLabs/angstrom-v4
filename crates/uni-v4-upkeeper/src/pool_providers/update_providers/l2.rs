@@ -13,7 +13,7 @@ use op_alloy_network::Optimism;
 pub use types::*;
 use uni_v4_common::PoolUpdate;
 use uni_v4_structure::{
-    L2AddressBook, L2FeeConfiguration, PoolId, PoolKey, PoolKeyWithFees, fee_config::L2FeeUpdate,
+    L2FeeConfiguration, PoolId, PoolKey, PoolKeyWithFees, fee_config::L2FeeUpdate,
     pool_registry::PoolRegistry, updates::l2::L2PoolUpdate
 };
 
@@ -197,8 +197,8 @@ where
 
         tracing::info!(?deploy_block, ?this_end_block);
         let filter = Filter::new()
-            .from_block(deploy_block as u64)
-            .to_block(this_end_block as u64)
+            .from_block(deploy_block)
+            .to_block(this_end_block)
             .address(angstrom_v2_factory);
 
         filters.push(filter);
@@ -282,9 +282,9 @@ where
             _ => false
         })
         .sorted_by_key(|update| match update {
-            PoolUpdate::FeeUpdate { block, .. } => -1 * *block as i64,
+            PoolUpdate::FeeUpdate { block, .. } => -(*block as i64),
             PoolUpdate::ChainSpecific { update, .. } => match update {
-                L2PoolUpdate::NewPool { block, .. } => -1 * *block as i64
+                L2PoolUpdate::NewPool { block, .. } => -(*block as i64)
             },
             _ => unreachable!()
         });

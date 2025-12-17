@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use alloy_consensus::Transaction;
 use alloy_eips::BlockId;
@@ -9,9 +9,9 @@ use alloy_rpc_types::Filter;
 use alloy_sol_types::{SolCall, SolEvent};
 use futures::StreamExt;
 // pub use types::*;
-use uni_v4_common::{PoolUpdate, V4Network};
+use uni_v4_common::PoolUpdate;
 use uni_v4_structure::{
-    L1AddressBook, L1FeeConfiguration, PoolId, PoolKey, PoolKeyWithFees, fee_config::L1FeeUpdate,
+    L1FeeConfiguration, PoolId, PoolKey, PoolKeyWithFees, fee_config::L1FeeUpdate,
     pool_registry::PoolRegistry, updates::l1::L1PoolUpdate
 };
 
@@ -290,8 +290,8 @@ where
 
         tracing::info!(?deploy_block, ?this_end_block);
         let filter = Filter::new()
-            .from_block(deploy_block as u64)
-            .to_block(this_end_block as u64)
+            .from_block(deploy_block)
+            .to_block(this_end_block)
             .address(controller_address);
 
         filters.push(filter);
@@ -334,7 +334,7 @@ where
                     }
                 };
 
-                let mut raw = pool_key_with_fees.pool_key.clone();
+                let mut raw = pool_key_with_fees.pool_key;
                 raw.fee = Default::default();
 
                 set.insert(raw, pool_key_with_fees);
@@ -356,7 +356,6 @@ where
             }
             set
         })
-        .into_iter()
-        .map(|(_, key)| key)
+        .into_values()
         .collect::<Vec<_>>()
 }

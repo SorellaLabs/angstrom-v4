@@ -179,7 +179,7 @@ where
         self.current_block
     }
 
-    /// Get all current pool keys
+    // /// Get all current pool keys
     // pub fn current_pool_keys(&self) -> Vec<PoolKey> {
     //     self.factory.current_pool_keys()
     // }
@@ -534,13 +534,10 @@ where
     fn handle_slot0_updates(&mut self, _: Vec<Slot0Update>) {}
 
     fn dispath_chain_specific_update(&mut self, pool_id: PoolId, update: L2PoolUpdate) {
-        match update {
-            L2PoolUpdate::NewPool { .. } => {
-                // CRITICAL: Process new pool to ensure it gets created in the factory
-                // This will trigger pool data loading and initialization
-                self.process_pool_update(PoolUpdate::ChainSpecific { pool_id, update });
-            }
-            _ => ()
+        if let L2PoolUpdate::NewPool { .. } = update {
+            // CRITICAL: Process new pool to ensure it gets created in the factory
+            // This will trigger pool data loading and initialization
+            self.process_pool_update(PoolUpdate::ChainSpecific { pool_id, update });
         }
     }
 }

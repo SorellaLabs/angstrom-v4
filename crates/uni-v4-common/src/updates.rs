@@ -1,9 +1,6 @@
-use std::{
-    cmp::Ordering,
-    collections::{HashMap, VecDeque}
-};
+use std::collections::{HashMap, VecDeque};
 
-use alloy_primitives::{Address, I256, U160, U256};
+use alloy_primitives::U256;
 use uni_v4_structure::{
     BaselinePoolState, PoolId,
     fee_config::FeeConfig,
