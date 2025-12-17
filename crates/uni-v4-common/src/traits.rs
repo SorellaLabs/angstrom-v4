@@ -4,8 +4,8 @@ use alloy_primitives::U256;
 use uni_v4_structure::{
     BaselinePoolState, PoolId,
     fee_config::FeeConfig,
-    tick_info::TickInfo,
-    updates::{ModifyLiquidityEventData, PoolUpdate, Slot0Data, SwapEventData}
+    pool_updates::{ModifyLiquidityEventData, PoolUpdate, Slot0Data, SwapEventData},
+    tick_info::TickInfo
 };
 
 use crate::V4Network;
@@ -22,15 +22,6 @@ pub trait PoolUpdateDelivery<T: V4Network>: Send + Sync {
     /// Get notification of a chain reorganization
     /// Returns: (from_block, to_block)
     fn get_reorg(&mut self) -> Option<(u64, u64)>;
-
-    // /// Get a new pool creation event
-    // /// Returns: (pool_id, token0, token1, bundle_fee, swap_fee, protocol_fee,
-    // /// tick_spacing, block)
-    // fn get_new_pool(&mut self) -> Option<(PoolId, Address, Address, u32, u32, u32, i32, u64)>;
-
-    // /// Get a pool removal event
-    // /// Returns: (pool_id, block)
-    // fn get_pool_removal(&mut self) -> Option<(PoolId, u64)>;
 
     /// Get a swap event
     /// Returns: (pool_id, block, tx_index, log_index, event_data)
@@ -77,33 +68,6 @@ pub trait PoolUpdateDeliveryExt<T: V4Network>: PoolUpdateDelivery<T> {
             return Some(PoolUpdate::Reorg { from_block, to_block });
         }
 
-        // if let Some((
-        //     pool_id,
-        //     token0,
-        //     token1,
-        //     bundle_fee,
-        //     swap_fee,
-        //     protocol_fee,
-        //     tick_spacing,
-        //     block
-        // )) = self.get_new_pool()
-        // {
-        //     return Some(PoolUpdate::from_new_pool(
-        //         pool_id,
-        //         token0,
-        //         token1,
-        //         bundle_fee,
-        //         swap_fee,
-        //         protocol_fee,
-        //         tick_spacing,
-        //         block
-        //     ));
-        // }
-
-        // if let Some((pool_id, block)) = self.get_pool_removal() {
-        //     return Some(PoolUpdate::PoolRemoved { pool_id, block });
-        // }
-
         if let Some((pool_id, block, tx_index, log_index, event)) = self.get_swap_event() {
             return Some(PoolUpdate::from_swap(pool_id, block, tx_index, log_index, event));
         }
@@ -127,10 +91,6 @@ pub trait PoolUpdateDeliveryExt<T: V4Network>: PoolUpdateDelivery<T> {
         if let Some((pool_id, state)) = self.get_new_pool_state() {
             return Some(PoolUpdate::NewPoolState { pool_id, state });
         }
-
-        // if let Some(update) = self.get_slot0_stream_update() {
-        //     return Some(PoolUpdate::Slot0Update(update));
-        // }
 
         if let Some((pool_id, update)) = self.get_chain_specific_update() {
             return Some(PoolUpdate::ChainSpecific { pool_id, update });

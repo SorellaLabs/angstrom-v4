@@ -11,15 +11,15 @@ use futures::StreamExt;
 use itertools::Itertools;
 use op_alloy_network::Optimism;
 pub use types::*;
-use uni_v4_common::PoolUpdate;
+use uni_v4_common::{PoolUpdate, V4Network};
 use uni_v4_structure::{
     L2FeeConfiguration, PoolId, PoolKey, PoolKeyWithFees, fee_config::L2FeeUpdate,
-    pool_registry::PoolRegistry, updates::l2::L2PoolUpdate
+    l2_structure::pool_updates::L2PoolUpdate, pool_registry::PoolRegistry
 };
 
 use crate::pool_providers::{
-    ProviderChainUpdate,
-    update_providers::{PoolUpdateError, PoolUpdateProvider}
+    ProviderChainInitialization, ProviderChainUpdate,
+    update_provider::{PoolUpdateError, PoolUpdateProvider}
 };
 
 mod types {
@@ -101,7 +101,7 @@ where
             .to_block(to_block);
 
         let l2_factory_logs = self
-            .provider
+            .provider()
             .get_logs(&l2_factory_filter)
             .await
             .map_err(|e| {
@@ -118,13 +118,15 @@ where
     ) -> Vec<PoolUpdate<Optimism>> {
         let mut updates = Vec::new();
 
+        let registry = self.pool_registry_mut();
+
         for log in logs {
             let block_number = log.block_number.unwrap();
 
             if let Ok(event) = AngstromL2Factory::PoolCreated::decode_log(&log.inner) {
                 let pool_key = event.key.clone().into();
 
-                self.pool_registry.add_new_pool(pool_key);
+                registry.add_new_pool(pool_key);
 
                 let pool_id = PoolId::from(pool_key);
 
@@ -340,4 +342,18 @@ where
     });
 
     pool_keys.values().cloned().collect()
+}
+
+impl<P> ProviderChainInitialization<Optimism> for P
+where
+    P: Provider<Optimism>
+{
+    async fn fetch_pools(
+        &self,
+        address_book: <Optimism as V4Network>::AddressBook,
+        start_block: u64,
+        end_block: u64
+    ) -> Result<Vec<PoolKeyWithFees<<Optimism as V4Network>::FeeConfig>>, PoolUpdateError> {
+        Ok(fetch_l2_pools(start_block, end_block, address_book.angstrom_v2_factory, self).await)
+    }
 }

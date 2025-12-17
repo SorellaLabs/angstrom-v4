@@ -1,11 +1,57 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use alloy_primitives::{Address, aliases::U24};
 
-use crate::{
-    PoolId, PoolKey,
-    pool_registry::{PoolRegistry, UniswapPoolIdSet}
-};
+use crate::{PoolId, PoolKey};
+
+pub trait PoolRegistry: Clone + Send + Sync + Unpin + Debug {
+    type PoolIdSet: UniswapPoolIdSet;
+
+    fn get(&self, pool_id: &PoolId) -> Option<&PoolKey>;
+
+    fn pools(&self, hook: Option<Address>) -> HashMap<PoolId, PoolKey>;
+
+    fn remove(&mut self, pool_id: &PoolId);
+
+    fn all_angstrom_pool_ids(&self) -> impl Iterator<Item = PoolId> + '_;
+
+    fn angstrom_pool_id_from_uniswap_pool_id(&self, pool_id: PoolId) -> Option<PoolId>;
+
+    fn all_uniswap_pool_ids(&self) -> impl Iterator<Item = PoolId> + '_;
+
+    fn add_new_pool(&mut self, pool_key: PoolKey);
+
+    fn add_new_pools(&mut self, pool_keys: impl IntoIterator<Item = PoolKey>) {
+        pool_keys
+            .into_iter()
+            .for_each(|pool_key| self.add_new_pool(pool_key));
+    }
+
+    /// Get pool key by token pair (searches all pools with these tokens)
+    /// Returns all pools that match the token pair, regardless of fee tier
+    fn get_pools_by_token_pair(
+        &self,
+        token0: Address,
+        token1: Address,
+        hook: Option<Address>
+    ) -> Vec<&PoolKey>;
+
+    /// Get pool ID by token pair and fee
+    /// Returns the pool ID if a pool exists with the given tokens and fee
+    fn get_pool_id_by_tokens_and_fee(
+        &self,
+        token0: Address,
+        token1: Address,
+        fee: u32,
+        hook: Option<Address>
+    ) -> Option<PoolId>;
+
+    fn make_pool_id_set(&self, pool_id: PoolId) -> Option<Self::PoolIdSet>;
+}
+
+pub trait UniswapPoolIdSet: Copy + Clone + Send + Sync + Unpin + Debug {
+    fn uniswap_pool_id(&self) -> PoolId;
+}
 
 #[derive(Debug, Clone)]
 pub struct L1PoolRegistry {
@@ -48,11 +94,7 @@ impl PoolRegistry for L1PoolRegistry {
 
     fn get(&self, pool_id: &PoolId) -> Option<&PoolKey> {
         let pool_key = self.uni_pools.get(pool_id);
-        if pool_key.is_some() {
-            pool_key
-        } else {
-            self.angstrom_registry.pools.get(pool_id)
-        }
+        if pool_key.is_some() { pool_key } else { self.angstrom_registry.pools.get(pool_id) }
     }
 
     fn pools(&self, hook: Option<Address>) -> HashMap<PoolId, PoolKey> {

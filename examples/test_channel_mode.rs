@@ -6,7 +6,7 @@ use alloy_provider::ProviderBuilder;
 use eyre::Result;
 use tokio::sync::mpsc;
 use uni_v4_common::PoolUpdate;
-use uni_v4_structure::{L1AddressBook, pool_registry::l1::L1PoolRegistry};
+use uni_v4_structure::{L1AddressBook, pool_registry::L1PoolRegistry};
 use uni_v4_upkeeper::pool_manager_service_builder::{
     NoOpEventStream, NoOpSlot0Stream, PoolManagerServiceBuilder
 };

@@ -1,11 +1,10 @@
 use alloy_network::{Ethereum, Network};
-use op_alloy_network::Optimism;
 
 use crate::{
-    L1AddressBook, L1FeeConfiguration, L2AddressBook, L2FeeConfiguration, UpdatePool,
+    L1AddressBook, L1FeeConfiguration, UpdatePool,
     fee_config::FeeConfig,
-    pool_registry::{PoolRegistry, l1::L1PoolRegistry, l2::L2PoolRegistry},
-    updates::{l1::L1PoolUpdate, l2::L2PoolUpdate}
+    pool_registry::{L1PoolRegistry, PoolRegistry},
+    pool_updates::L1PoolUpdate
 };
 
 pub trait V4Network: Network + Send + Sync + Unpin {
@@ -20,11 +19,4 @@ impl V4Network for Ethereum {
     type FeeConfig = L1FeeConfiguration;
     type PoolRegistry = L1PoolRegistry;
     type PoolUpdate = L1PoolUpdate;
-}
-
-impl V4Network for Optimism {
-    type AddressBook = L2AddressBook;
-    type FeeConfig = L2FeeConfiguration;
-    type PoolRegistry = L2PoolRegistry;
-    type PoolUpdate = L2PoolUpdate;
 }

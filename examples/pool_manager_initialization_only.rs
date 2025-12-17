@@ -1,15 +1,15 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use alloy_network::Ethereum;
 use alloy_primitives::address;
 use alloy_provider::{ProviderBuilder, WsConnect};
 use eyre::Result;
 use jsonrpsee::ws_client::WsClientBuilder;
 use tokio::sync::mpsc;
-use alloy_network::Ethereum;
 use uni_v4_common::PoolUpdate;
-use uni_v4_structure::{L1AddressBook, pool_registry::l1::L1PoolRegistry};
+use uni_v4_structure::{L1AddressBook, pool_registry::L1PoolRegistry};
 use uni_v4_upkeeper::{
-    pool_manager_service_builder::{NoOpSlot0Stream, PoolManagerServiceBuilder, NoOpEventStream},
+    pool_manager_service_builder::{NoOpEventStream, NoOpSlot0Stream, PoolManagerServiceBuilder},
     slot0::Slot0Client
 };
 
@@ -95,7 +95,8 @@ async fn main() -> Result<()> {
                 }
                 PoolUpdate::FeeUpdate { pool_id, block, update } => {
                     println!(
-                        "💰 Received FeeUpdate for pool {pool_id:?} at block {block} - update: {:?}",
+                        "💰 Received FeeUpdate for pool {pool_id:?} at block {block} - update: \
+                         {:?}",
                         update
                     );
                 }

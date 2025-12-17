@@ -4,8 +4,8 @@ use alloy_primitives::U256;
 use uni_v4_structure::{
     BaselinePoolState, PoolId,
     fee_config::FeeConfig,
-    tick_info::TickInfo,
-    updates::{ModifyLiquidityEventData, PoolUpdate, Slot0Data, SwapEventData}
+    pool_updates::{ModifyLiquidityEventData, PoolUpdate, Slot0Data, SwapEventData},
+    tick_info::TickInfo
 };
 
 use crate::{V4Network, traits::PoolUpdateDelivery};

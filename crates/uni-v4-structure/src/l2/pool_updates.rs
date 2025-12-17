@@ -3,7 +3,6 @@ use op_alloy_network::Optimism;
 
 use crate::{BaselinePoolState, UpdatePool};
 
-/// Different types of pool updates
 #[derive(Debug, Clone)]
 pub enum L2PoolUpdate {
     NewPool {

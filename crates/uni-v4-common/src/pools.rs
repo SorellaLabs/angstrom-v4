@@ -11,8 +11,8 @@ use tokio::sync::{
     futures::{Notified, OwnedNotified}
 };
 use uni_v4_structure::{
-    BaselinePoolState, PoolId, V4Network, fee_config::FeeConfig, UpdatePool,
-    updates::PoolUpdate
+    BaselinePoolState, PoolId, UpdatePool, V4Network, fee_config::FeeConfig,
+    pool_updates::PoolUpdate
 };
 use uniswap_v3_math::error::UniswapV3MathError;
 

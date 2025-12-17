@@ -1,14 +1,13 @@
 use alloy_network::Ethereum;
 use alloy_provider::Provider;
 use futures::Stream;
-use op_alloy_network::Optimism;
 use uni_v4_common::{PoolUpdate, V4Network};
 
 pub mod completed_block_stream;
-pub mod update_providers;
+pub mod update_provider;
 use uni_v4_structure::{PoolId, PoolKeyWithFees};
 
-use crate::pool_providers::update_providers::PoolUpdateError;
+use crate::pool_providers::update_provider::PoolUpdateError;
 
 pub trait PoolEventStream<T: V4Network>:
     Stream<Item = Vec<PoolUpdate<T>>> + Send + Unpin + 'static
@@ -45,31 +44,11 @@ where
         start_block: u64,
         end_block: u64
     ) -> Result<Vec<PoolKeyWithFees<<Ethereum as V4Network>::FeeConfig>>, PoolUpdateError> {
-        Ok(crate::pool_providers::update_providers::l1::fetch_angstrom_pools(
+        Ok(crate::pool_providers::update_provider::fetch_angstrom_pools(
             start_block,
             end_block,
             address_book.angstrom,
             address_book.controller_v1,
-            self
-        )
-        .await)
-    }
-}
-
-impl<P> ProviderChainInitialization<Optimism> for P
-where
-    P: Provider<Optimism>
-{
-    async fn fetch_pools(
-        &self,
-        address_book: <Optimism as V4Network>::AddressBook,
-        start_block: u64,
-        end_block: u64
-    ) -> Result<Vec<PoolKeyWithFees<<Optimism as V4Network>::FeeConfig>>, PoolUpdateError> {
-        Ok(crate::pool_providers::update_providers::l2::fetch_l2_pools(
-            start_block,
-            end_block,
-            address_book.angstrom_v2_factory,
             self
         )
         .await)

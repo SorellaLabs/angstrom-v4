@@ -13,6 +13,10 @@ malachite.workspace = true
 serde.workspace = true
 uniswap_v3_math.workspace = true
 alloy-network.workspace = true
-op-alloy-network.workspace = true
-alloy-contract.workspace = true
+op-alloy-network = { workspace = true, optional = true }
 alloy-sol-types.workspace = true
+
+
+[features]
+default = []
+l2 = ["dep:op-alloy-network"]

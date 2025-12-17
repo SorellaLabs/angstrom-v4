@@ -2,9 +2,9 @@ use alloy_primitives::{Address, B256, I256};
 use liquidity_base::BaselineLiquidity;
 pub use pool_key::{PoolKey, PoolKeyWithFees};
 use pool_swap::{PoolSwap, PoolSwapResult};
+pub use pool_updates::UpdatePool;
 use serde::{Deserialize, Serialize};
 use sqrt_pricex96::SqrtPriceX96;
-pub use updates::UpdatePool;
 
 use crate::fee_config::FeeConfig;
 pub use crate::fee_config::{
@@ -13,8 +13,15 @@ pub use crate::fee_config::{
 };
 pub type PoolId = B256;
 
+#[cfg(feature = "l2")]
+mod l2;
+#[cfg(feature = "l2")]
+pub mod l2_structure {
+    pub use super::l2::*;
+}
+
 mod network;
-pub mod updates;
+pub mod pool_updates;
 pub use network::*;
 mod address_book;
 pub mod fee_config;

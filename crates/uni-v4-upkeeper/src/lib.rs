@@ -9,6 +9,13 @@ pub mod pool_manager_service_builder;
 pub mod pool_providers;
 pub mod slot0;
 
+#[cfg(feature = "l2")]
+mod l2;
+#[cfg(feature = "l2")]
+pub mod l2_upkeeper {
+    pub use super::l2::*;
+}
+
 fn i128_to_i256(value: i128) -> I256 {
     I256::try_from(value).unwrap()
 }

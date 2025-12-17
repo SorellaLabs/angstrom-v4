@@ -12,7 +12,7 @@ use jsonrpsee::{
     proc_macros::rpc,
     ws_client::WsClient
 };
-use uni_v4_structure::{PoolId, updates::l1::Slot0Update};
+use uni_v4_structure::{PoolId, pool_updates::Slot0Update};
 
 #[rpc(client, namespace = "angstrom")]
 #[async_trait::async_trait]

@@ -9,12 +9,10 @@ authors = ["Sorella Labs"]
 repository = "https://github.com/SorellaLabs/uni-v4"
 
 [workspace.dependencies]
-# Internal crates
 uni-v4-common = { path = "crates/uni-v4-common" }
 uni-v4-structure = { path = "crates/uni-v4-structure" }
 uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper" }
 
-# External dependencies
 alloy-contract = { version = "1.0.41", default-features = false }
 alloy-consensus = { version = "1.0.41", default-features = false }
 alloy-eips = { version = "1.0.41", default-features = false }
@@ -63,3 +61,4 @@ tracing = "0"
 tracing-subscriber = "0.3.19"
 uniswap_v3_math = { git = "https://github.com/SorellaLabs/v3-math", branch = "main" }
 op-alloy-network = { version = "0.22.1", default-features = false }
+op-alloy-rpc-types = { version = "0.22.1", default-features = false }
