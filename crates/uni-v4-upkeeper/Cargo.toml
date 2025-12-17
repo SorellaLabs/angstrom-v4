@@ -36,5 +36,6 @@ itertools.workspace = true
 
 
 [features]
-default = []
+# default = []
+default = ["l2"]
 l2 = ["uni-v4-structure/l2", "uni-v4-common/l2", "dep:op-alloy-network"]

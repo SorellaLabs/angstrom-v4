@@ -24,5 +24,6 @@ uni-v4-upkeeper = { workspace = true, features = ["l2"] }
 
 
 [features]
-default = []
+# default = []
+default = ["l2"]
 l2 = ["uni-v4-structure/l2", "uni-v4-common/l2", "uni-v4-upkeeper/l2"]

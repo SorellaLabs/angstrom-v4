@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use alloy_primitives::I256;
 use thiserror::Error;
 
