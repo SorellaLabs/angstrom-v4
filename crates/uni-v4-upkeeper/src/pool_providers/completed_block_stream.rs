@@ -11,7 +11,6 @@ pub struct CompletedBlockStream<P: Provider> {
     prev_block_hash:   B256,
     prev_block_number: u64,
     provider:          Arc<P>,
-    /// ParentHash
     solve_for_data:    Option<BlockQueryResponse>,
     block_stream:      Pin<Box<dyn Stream<Item = Block> + Send + 'static>>,
     processing_blocks: FuturesOrdered<BoxFuture<'static, BlockQueryResponse>>

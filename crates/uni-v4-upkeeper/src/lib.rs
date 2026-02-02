@@ -1,15 +1,22 @@
+#![allow(clippy::type_complexity)]
+
 use alloy_primitives::I256;
 use thiserror::Error;
 
 pub mod baseline_pool_factory;
-pub mod fetch_pool_keys;
-pub mod loaders;
+pub mod bindings;
 pub mod pool_data_loader;
 pub mod pool_manager_service;
 pub mod pool_manager_service_builder;
 pub mod pool_providers;
-pub mod pool_registry;
 pub mod slot0;
+
+#[cfg(feature = "l2")]
+mod l2;
+#[cfg(feature = "l2")]
+pub mod l2_upkeeper {
+    pub use super::l2::*;
+}
 
 fn i128_to_i256(value: i128) -> I256 {
     I256::try_from(value).unwrap()

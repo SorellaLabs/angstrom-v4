@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
 use alloy::{
-    network::Ethereum,
-    primitives::{I256, address},
+    primitives::{I256, U256},
     providers::ProviderBuilder
 };
-use alloy_primitives::U256;
+use op_alloy_network::Optimism;
+use uni_v4::l2_structure::{L2AddressBook, pool_registry::L2PoolRegistry};
 use uni_v4_upkeeper::pool_manager_service_builder::PoolManagerServiceBuilder;
 
-// Test configuration - Uses ETH_URL environment variable
 fn get_eth_url() -> Option<String> {
-    std::env::var("ETH_URL").ok()
+    dotenv::dotenv().ok();
+    std::env::var("BASE_URL").ok()
 }
 
 #[tokio::test]
@@ -18,7 +18,7 @@ async fn test_specific_pool_at_block() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No ETH_URL SET, returning");
+        println!("No BASE_URL SET, returning");
         return;
     };
 
@@ -26,16 +26,14 @@ async fn test_specific_pool_at_block() {
     let target_block = 23020805;
 
     // Real addresses from Sepolia deployment
-    let angstrom_address = address!("0x0000000aa232009084Bd71A5797d089AA4Edfad4");
-    let controller_address = address!("0x1746484EA5e11C75e009252c102C8C33e0315fD4");
-    let pool_manager_address = address!("0x000000000004444c5dc75cB358380D2e3dE08A90");
-
-    // Set the controller address for the fetch function
-    uni_v4_upkeeper::fetch_pool_keys::set_controller_address(controller_address);
+    let pool_manager_address =
+        alloy::primitives::address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
+    let angstrom_l2_factory =
+        alloy::primitives::address!("0x000000000004444c5dc75cB358380D2e3dE08A90");
 
     // Create real provider
     let provider = Arc::new(
-        ProviderBuilder::<_, _, Ethereum>::default()
+        ProviderBuilder::<_, _, Optimism>::default()
             .with_recommended_fillers()
             .connect(&eth_url)
             .await
@@ -44,11 +42,14 @@ async fn test_specific_pool_at_block() {
 
     println!("Loading pools at block {deploy_block} to find available pools");
 
+    let address_book = L2AddressBook::new(angstrom_l2_factory);
+    let pool_registry = L2PoolRegistry::default();
+
     // Load pools to see what's available
     let service = PoolManagerServiceBuilder::new_with_noop_stream(
         provider.clone(),
-        angstrom_address,
-        controller_address,
+        address_book,
+        pool_registry,
         pool_manager_address,
         deploy_block
     )

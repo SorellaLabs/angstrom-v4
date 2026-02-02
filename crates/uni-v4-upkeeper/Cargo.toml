@@ -6,11 +6,9 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-# Internal dependencies
 uni-v4-common.workspace = true
 uni-v4-structure.workspace = true
 
-# External dependencies
 alloy-eips.workspace = true
 alloy-network.workspace = true
 alloy-contract.workspace = true
@@ -27,6 +25,7 @@ itertools.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+op-alloy-network = { workspace = true, optional = true }
 tracing.workspace = true
 uniswap_v3_math.workspace = true
 
@@ -34,3 +33,9 @@ uniswap_v3_math.workspace = true
 convert_case = "0"
 alloy-sol-types.workspace = true
 itertools.workspace = true
+
+
+[features]
+# default = []
+default = ["l2"]
+l2 = ["uni-v4-structure/l2", "uni-v4-common/l2", "dep:op-alloy-network"]
