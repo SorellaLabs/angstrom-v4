@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::OnceLock
-};
+use std::{collections::HashMap, sync::OnceLock};
 
 use alloy_network::Network;
 use alloy_primitives::{Address, aliases::I24};
