@@ -93,8 +93,6 @@ impl<P: Provider<Optimism> + 'static> Stream for HistoricalBlockStream<P> {
     }
 }
 
-
-
 #[tokio::test]
 async fn test_pool_state_consistency() {
     // Get ETH URL from environment
@@ -113,7 +111,7 @@ async fn test_pool_state_consistency() {
 
     // Real addresses from Base deployment
     let pool_manager_address =
-        alloy::primitives::address!("0x498581ff718922c3f8e6a244956af099b2652b2b");+
+        alloy::primitives::address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
     let angstrom_l2_factory =
         alloy::primitives::address!("0x000000000004444c5dc75cB358380D2e3dE08A90");
 
