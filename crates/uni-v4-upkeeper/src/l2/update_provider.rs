@@ -157,6 +157,20 @@ where
         logs: Vec<alloy_rpc_types::Log>,
         hook_floors: &HashMap<Address, u128>
     ) -> Vec<PoolUpdate<Optimism>> {
+        // Pre-scan: collect hook-level state that may precede PoolCreated in
+        // the same block. Without this, JITTaxStatusUpdated / WithdrawOnly
+        // events emitted before PoolCreated would be lost because the pool
+        // isn't in the registry yet when those events are processed.
+        let mut hook_jit_tax: HashMap<Address, bool> = HashMap::new();
+        let mut global_withdraw_only = false;
+        for log in &logs {
+            if let Ok(event) = AngstromL2Factory::JITTaxStatusUpdated::decode_log(&log.inner) {
+                hook_jit_tax.insert(event.hook, event.data.newJITTaxEnabled);
+            } else if AngstromL2Factory::WithdrawOnly::decode_log(&log.inner).is_ok() {
+                global_withdraw_only = true;
+            }
+        }
+
         let mut updates = Vec::new();
 
         let registry = self.pool_registry_mut();
@@ -191,7 +205,12 @@ where
                         protocol_tax_fee_e6: event.protocolTaxFeeE6.to(),
                         creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
                         protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
-                        priority_fee_tax_floor: floor
+                        priority_fee_tax_floor: floor,
+                        jit_tax_enabled: hook_jit_tax
+                            .get(&event.hook)
+                            .copied()
+                            .unwrap_or(false),
+                        withdraw_only: global_withdraw_only
                     }
                 });
             } else if let Ok(event) =
@@ -378,7 +397,12 @@ where
                     protocol_tax_fee_e6: event.protocolTaxFeeE6.to(),
                     creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
                     protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
-                    priority_fee_tax_floor: floor
+                    priority_fee_tax_floor: floor,
+                    jit_tax_enabled: hook_jit_tax
+                        .get(&event.hook)
+                        .copied()
+                        .unwrap_or(false),
+                    withdraw_only: global_withdraw_only
                 }
             })
         } else if let Ok(event) = AngstromL2Factory::ProtocolSwapFeeUpdated::decode_log(&log.inner)
@@ -411,10 +435,10 @@ where
                 }
             })
         } else {
-            // PriorityFeeTaxFloorUpdated, JITTaxStatusUpdated, and WithdrawOnly events
-            // are intentionally dropped during startup replay. The floor values are
-            // already fetched from the latest on-chain state via fetch_hook_floors()
-            // RPC calls above, and JIT/withdraw state is tracked in the first pass.
+            // PriorityFeeTaxFloorUpdated events are dropped — floor values come from
+            // latest on-chain state via fetch_hook_floors() RPC calls above.
+            // JITTaxStatusUpdated and WithdrawOnly events are dropped — their state
+            // is collected in the first pass and applied during pool construction.
             None
         }
     });
@@ -466,6 +490,8 @@ where
                 hook_fee,
                 hook,
                 priority_fee_tax_floor,
+                jit_tax_enabled,
+                withdraw_only,
                 ..
             } => {
                 let pool_key_with_fees = PoolKeyWithFees {
@@ -483,8 +509,8 @@ where
                         creator_swap_fee_e6,
                         protocol_swap_fee_e6,
                         priority_fee_tax_floor,
-                        jit_tax_enabled: hook_jit_tax.get(&hook).copied().unwrap_or(false),
-                        withdraw_only: global_withdraw_only
+                        jit_tax_enabled,
+                        withdraw_only
                     }
                 };
                 pool_keys.insert(pool_id, pool_key_with_fees);

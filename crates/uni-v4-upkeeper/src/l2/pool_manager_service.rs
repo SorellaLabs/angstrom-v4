@@ -38,6 +38,8 @@ where
                 creator_swap_fee_e6,
                 protocol_swap_fee_e6,
                 priority_fee_tax_floor,
+                jit_tax_enabled,
+                withdraw_only,
                 ..
             } => {
                 if self.auto_pool_creation {
@@ -55,8 +57,8 @@ where
                         creator_swap_fee_e6:    *creator_swap_fee_e6,
                         protocol_swap_fee_e6:   *protocol_swap_fee_e6,
                         priority_fee_tax_floor: *priority_fee_tax_floor,
-                        jit_tax_enabled:        false,
-                        withdraw_only:          false
+                        jit_tax_enabled:        *jit_tax_enabled,
+                        withdraw_only:          *withdraw_only
                     };
                     self.handle_new_pool(pool_key, *block, fee_cfg);
                     tracing::info!("Pool configured: {pool_id:?}:\n{fee_cfg:?}");
