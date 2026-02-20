@@ -28,16 +28,15 @@ path = "pool_manager_initialization_only.rs"
 [dependencies]
 # Internal dependencies
 uni-v4-common.workspace = true
+uni-v4-structure.workspace = true
 uni-v4-upkeeper.workspace = true
 
-# External dependencies
-alloy-eips.workspace = true
 alloy-network.workspace = true
 alloy-provider.workspace = true
 alloy-primitives.workspace = true
 eyre.workspace = true
-futures.workspace = true
 jsonrpsee.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+uniswap_v3_math.workspace = true

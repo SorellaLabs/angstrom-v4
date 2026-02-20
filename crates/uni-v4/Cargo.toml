@@ -6,7 +6,24 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-# Internal dependencies
 uni-v4-common.workspace = true
 uni-v4-structure.workspace = true
 uni-v4-upkeeper.workspace = true
+
+
+[dev-dependencies]
+alloy = { version = "1.0.41", features = ["full"] }
+futures.workspace = true
+tokio.workspace = true
+dotenv = "0"
+op-alloy-network.workspace = true
+op-alloy-rpc-types.workspace = true
+uni-v4-common = { workspace = true, features = ["l2"] }
+uni-v4-structure = { workspace = true, features = ["l2"] }
+uni-v4-upkeeper = { workspace = true, features = ["l2"] }
+
+
+[features]
+# default = []
+default = ["l2"]
+l2 = ["uni-v4-structure/l2", "uni-v4-common/l2", "uni-v4-upkeeper/l2"]

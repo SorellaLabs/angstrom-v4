@@ -1,18 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
-use alloy_eips::BlockNumberOrTag;
+use alloy_network::Ethereum;
 use alloy_primitives::address;
-use alloy_provider::{Provider, ProviderBuilder, WsConnect};
+use alloy_provider::{ProviderBuilder, WsConnect};
 use eyre::Result;
-use futures::StreamExt;
 use tokio::sync::mpsc;
-use uni_v4_common::{PoolUpdate, StreamMode};
-use uni_v4_upkeeper::{
-    pool_manager_service_builder::{NoOpSlot0Stream, PoolManagerServiceBuilder},
-    pool_providers::{
-        completed_block_stream::CompletedBlockStream,
-        pool_update_provider::{PoolUpdateProvider, StateStream}
-    }
+use uni_v4_common::PoolUpdate;
+use uni_v4_structure::{L1AddressBook, pool_registry::L1PoolRegistry};
+use uni_v4_upkeeper::pool_manager_service_builder::{
+    NoOpEventStream, NoOpSlot0Stream, PoolManagerServiceBuilder
 };
 
 #[tokio::main]
@@ -34,52 +30,21 @@ async fn main() -> Result<()> {
     let ws = WsConnect::new(ws_url);
     let provider = Arc::new(ProviderBuilder::default().connect_ws(ws).await?);
 
-    println!("📊 Setting up pool update provider...");
+    println!("📊 Setting up address book and registry...");
 
-    // Choose the stream mode (Full or InitializationOnly)
-    let stream_mode = StreamMode::Full; // Change to StreamMode::InitializationOnly to filter updates
-
-    let update_provider = PoolUpdateProvider::new(
-        provider.clone(),
-        pool_manager_address,
-        controller_address,
-        angstrom_address,
-        Default::default()
-    )
-    .await
-    .with_stream_mode(stream_mode);
-
-    println!("   Using stream mode: {stream_mode:?}");
-
-    // Create block stream
-    let latest_block = provider
-        .get_block(BlockNumberOrTag::Latest.into())
-        .await?
-        .unwrap();
-
-    let block = latest_block.header.number;
-    let prev_block_hash = latest_block.header.parent_hash;
-
-    let block_stream = provider
-        .subscribe_full_blocks()
-        .into_stream()
-        .await?
-        .filter_map(|result| async move { result.ok() })
-        .take(1000);
-
-    let block_stream =
-        CompletedBlockStream::new(prev_block_hash, block, provider.clone(), Box::pin(block_stream));
-    let event_stream = StateStream::new(update_provider, block_stream);
+    let address_book = L1AddressBook::new(controller_address, angstrom_address);
+    let pool_registry = L1PoolRegistry::new(angstrom_address);
+    let event_stream = NoOpEventStream::<Ethereum>::default();
 
     // Create channel for receiving pool updates
-    let (tx, mut rx) = mpsc::channel::<PoolUpdate>(1000);
+    let (tx, mut rx) = mpsc::channel::<PoolUpdate<Ethereum>>(1000);
 
     // Build service with channel mode
     println!("🔧 Building pool manager service with channel mode...");
     let service = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
-        angstrom_address,
-        controller_address,
+        address_book,
+        pool_registry,
         pool_manager_address,
         deploy_block,
         event_stream
@@ -115,8 +80,8 @@ async fn main() -> Result<()> {
                 PoolUpdate::NewBlock(block) => {
                     println!("📦 Block #{block}: Received NewBlock");
                 }
-                PoolUpdate::NewPool { pool_id, .. } => {
-                    println!("🏊 Received NewPool config for pool {pool_id:?}");
+                PoolUpdate::ChainSpecific { pool_id, update } => {
+                    println!("🔄 Received ChainSpecific update for pool {pool_id:?}: {:?}", update);
                 }
                 PoolUpdate::SwapEvent { pool_id, .. } => {
                     println!("💱 Received SwapEvent for pool {pool_id:?}");
@@ -130,8 +95,12 @@ async fn main() -> Result<()> {
                 PoolUpdate::NewPoolState { pool_id, .. } => {
                     println!("🆕 Received NewPoolState with state for pool {pool_id:?}");
                 }
-                PoolUpdate::Slot0Update(update) => {
-                    println!("🔄 Received Slot0Update for pool {:?}", update.angstrom_pool_id);
+                PoolUpdate::UpdatedSlot0 { pool_id, data } => {
+                    println!(
+                        "🔄 Received UpdatedSlot0 for pool {:?} - tick: {}, sqrt_price: {}, \
+                         liquidity: {}",
+                        pool_id, data.tick, data.sqrt_price_x96, data.liquidity
+                    );
                 }
                 _ => {
                     println!("📬 Received other message type");

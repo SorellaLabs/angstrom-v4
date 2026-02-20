@@ -1,63 +1,34 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     future::Future,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll}
 };
 
-use alloy_consensus::Transaction;
+use alloy_consensus::{BlockHeader, Transaction};
 use alloy_eips::BlockId;
+use alloy_network::{BlockResponse, Ethereum, Network};
 use alloy_primitives::{Address, U160, aliases::I24};
 use alloy_provider::Provider;
-use alloy_rpc_types::{Block, Filter};
+use alloy_rpc_types::Filter;
 use alloy_sol_types::{SolCall, SolEvent};
 use futures::{FutureExt, StreamExt, stream::Stream};
 use thiserror::Error;
-use uni_v4_common::{
-    ModifyLiquidityEventData, PoolId, PoolKey, PoolUpdate, Slot0Data, StreamMode, SwapEventData
+// pub use types::*;
+use uni_v4_common::PoolUpdate;
+use uni_v4_common::{ModifyLiquidityEventData, StreamMode, SwapEventData, V4Network};
+use uni_v4_structure::{
+    L1FeeConfiguration, PoolId, PoolKey, PoolKeyWithFees, UpdatePool,
+    fee_config::L1FeeUpdate,
+    pool_registry::PoolRegistry,
+    pool_updates::{L1PoolUpdate, Slot0Data}
 };
 
 use crate::{
     pool_data_loader::{DataLoader, IUniswapV4Pool, PoolDataLoader},
-    pool_providers::PoolEventStream,
-    pool_registry::UniswapPoolRegistry
+    pool_providers::{PoolEventStream, ProviderChainUpdate}
 };
-
-/// Default number of blocks to keep in history for reorg detection
-const DEFAULT_REORG_DETECTION_BLOCKS: u64 = 10;
-
-/// Default chunk size for block processing
-const DEFAULT_REORG_LOOKBACK_BLOCK_CHUNK: u64 = 100;
-
-alloy_sol_types::sol! {
-    #[derive(Debug, PartialEq, Eq)]
-    contract ControllerV1 {
-
-    event PoolConfigured(
-        address indexed asset0,
-        address indexed asset1,
-        uint16 tickSpacing,
-        uint24 bundleFee,
-        uint24 unlockedFee,
-        uint24 protocolUnlockedFee
-    );
-
-    event PoolRemoved(
-        address indexed asset0, address indexed asset1, int24 tickSpacing, uint24 feeInE6
-    );
-
-        struct PoolUpdate {
-            address assetA;
-            address assetB;
-            uint24 bundleFee;
-            uint24 unlockedFee;
-            uint24 protocolUnlockedFee;
-        }
-
-        function batchUpdatePools(PoolUpdate[] calldata updates) external;
-    }
-}
 
 #[derive(Debug, Error)]
 pub enum PoolUpdateError {
@@ -80,15 +51,15 @@ struct StoredEvent {
 }
 
 /// Pool update provider that streams pool state changes
-pub struct PoolUpdateProvider<P>
+pub struct PoolUpdateProvider<P, T>
 where
-    P: Provider + 'static
+    P: Provider<T> + 'static,
+    T: V4Network
 {
     provider:                   Arc<P>,
     pool_manager:               Address,
-    controller_address:         Address,
-    angstrom_address:           Address,
-    pool_registry:              UniswapPoolRegistry,
+    address_book:               T::AddressBook,
+    pool_registry:              T::PoolRegistry,
     tracked_pools:              HashSet<PoolId>,
     event_history:              VecDeque<StoredEvent>,
     current_block:              u64,
@@ -97,53 +68,46 @@ where
     stream_mode:                StreamMode
 }
 
-impl<P> PoolUpdateProvider<P>
+impl<P, T> PoolUpdateProvider<P, T>
 where
-    P: Provider + 'static
+    P: Provider<T> + 'static,
+    T: V4Network,
+    Self: ProviderChainUpdate<T>
 {
     /// Create a new pool update provider
     pub async fn new(
         provider: Arc<P>,
         pool_manager: Address,
-        controller_address: Address,
-        angstrom_address: Address,
-        pool_registry: UniswapPoolRegistry
+        address_book: T::AddressBook,
+        pool_registry: T::PoolRegistry
     ) -> Self {
         let current_block = provider
             .get_block(BlockId::Number(alloy_eips::BlockNumberOrTag::Latest))
             .await
             .unwrap()
             .unwrap()
+            .header()
             .number();
 
-        Self::new_at_block(
-            provider,
-            pool_manager,
-            controller_address,
-            angstrom_address,
-            pool_registry,
-            current_block
-        )
+        Self::new_at_block(provider, pool_manager, address_book, pool_registry, current_block)
     }
 
     /// Create a new pool update provider at a specific block
     pub fn new_at_block(
         provider: Arc<P>,
         pool_manager: Address,
-        controller_address: Address,
-        angstrom_address: Address,
-        pool_registry: UniswapPoolRegistry,
+        address_book: T::AddressBook,
+        pool_registry: T::PoolRegistry,
         current_block: u64
     ) -> Self {
         Self::new_with_config(
             provider,
             pool_manager,
-            controller_address,
-            angstrom_address,
-            pool_registry,
             current_block,
             DEFAULT_REORG_DETECTION_BLOCKS,
-            DEFAULT_REORG_LOOKBACK_BLOCK_CHUNK
+            DEFAULT_REORG_LOOKBACK_BLOCK_CHUNK,
+            address_book,
+            pool_registry
         )
     }
 
@@ -151,26 +115,41 @@ where
     pub fn new_with_config(
         provider: Arc<P>,
         pool_manager: Address,
-        controller_address: Address,
-        angstrom_address: Address,
-        pool_registry: UniswapPoolRegistry,
         current_block: u64,
         reorg_detection_blocks: u64,
-        reorg_lookback_block_chunk: u64
+        reorg_lookback_block_chunk: u64,
+        address_book: T::AddressBook,
+        pool_registry: T::PoolRegistry
     ) -> Self {
         Self {
             provider,
             pool_manager,
-            controller_address,
-            angstrom_address,
-            pool_registry,
             tracked_pools: HashSet::new(),
             event_history: VecDeque::with_capacity(reorg_detection_blocks as usize),
             current_block,
             reorg_detection_blocks,
             reorg_lookback_block_chunk,
-            stream_mode: StreamMode::default()
+            stream_mode: StreamMode::default(),
+            address_book,
+            pool_registry
         }
+    }
+
+    pub fn provider(&self) -> &P {
+        &self.provider
+    }
+
+    pub fn pool_registry_mut(&mut self) -> &mut T::PoolRegistry {
+        &mut self.pool_registry
+    }
+
+    pub fn address_book(&self) -> T::AddressBook {
+        self.address_book
+    }
+
+    pub fn with_address_book(mut self, address_book: T::AddressBook) -> Self {
+        self.address_book = address_book;
+        self
     }
 
     /// Set the stream mode for this provider
@@ -199,7 +178,7 @@ where
         &self,
         log: &alloy_rpc_types::Log,
         block_number: u64
-    ) -> Option<PoolUpdate> {
+    ) -> Option<PoolUpdate<T>> {
         if let Ok(swap_event) = IUniswapV4Pool::Swap::decode_log(&log.inner) {
             // Check if we're tracking this Uniswap pool ID
             if self.tracked_pools.contains(&swap_event.id) {
@@ -231,7 +210,7 @@ where
         log: &alloy_rpc_types::Log,
         block_number: u64,
         store_in_history: bool
-    ) -> Option<PoolUpdate> {
+    ) -> Option<PoolUpdate<T>> {
         if let Ok(modify_event) = IUniswapV4Pool::ModifyLiquidity::decode_log(&log.inner) {
             // Check if we're tracking this Uniswap pool ID
             if self.tracked_pools.contains(&modify_event.id) {
@@ -266,127 +245,13 @@ where
         None
     }
 
-    /// Process controller event logs
-    fn process_controller_logs(&mut self, logs: Vec<alloy_rpc_types::Log>) -> Vec<PoolUpdate> {
-        let mut updates = Vec::new();
-
-        for log in logs {
-            let block_number = log.block_number.unwrap();
-
-            if let Ok(event) = ControllerV1::PoolConfigured::decode_log(&log.inner) {
-                let pool_key = PoolKey {
-                    currency0:   event.asset0,
-                    currency1:   event.asset1,
-                    fee:         event.bundleFee,
-                    tickSpacing: I24::unchecked_from(event.tickSpacing),
-                    hooks:       self.angstrom_address
-                };
-
-                self.pool_registry.add_new_pool(pool_key);
-
-                // Get the Uniswap pool ID from registry
-                let angstrom_pool_id = PoolId::from(pool_key);
-                let pool_id = self
-                    .pool_registry
-                    .private_key_from_public(&angstrom_pool_id)
-                    .unwrap();
-
-                updates.push(PoolUpdate::NewPool {
-                    pool_id,
-                    token0: pool_key.currency0,
-                    token1: pool_key.currency1,
-                    bundle_fee: event.bundleFee.to(),
-                    swap_fee: event.unlockedFee.to(),
-                    protocol_fee: event.protocolUnlockedFee.to(),
-                    tick_spacing: event.tickSpacing as i32,
-                    block: block_number
-                });
-            }
-
-            if let Ok(event) = ControllerV1::PoolRemoved::decode_log(&log.inner) {
-                let pool_key = PoolKey {
-                    currency0:   event.asset0,
-                    currency1:   event.asset1,
-                    fee:         event.feeInE6,
-                    tickSpacing: event.tickSpacing,
-                    hooks:       self.angstrom_address
-                };
-
-                // Get the Uniswap pool ID from registry
-                let angstrom_pool_id = PoolId::from(pool_key);
-                let pool_id = self
-                    .pool_registry
-                    .private_key_from_public(&angstrom_pool_id)
-                    .unwrap();
-
-                updates.push(PoolUpdate::PoolRemoved { pool_id, block: block_number });
-            }
-        }
-
-        updates
-    }
-
-    /// Process batch update pools from transaction
-    fn process_batch_update_pools(
-        &self,
-        tx: &alloy_rpc_types::Transaction,
-        block_number: u64
-    ) -> Vec<PoolUpdate> {
-        let mut updates = Vec::new();
-
-        // Check if transaction is to the controller
-        if tx.to() == Some(self.controller_address) {
-            // Try to decode as batchUpdatePools call
-            if let Ok(call) = ControllerV1::batchUpdatePoolsCall::abi_decode(tx.input()) {
-                for update in call.updates {
-                    // Normalize asset order
-                    let (_asset0, _asset1) = if update.assetB > update.assetA {
-                        (update.assetA, update.assetB)
-                    } else {
-                        (update.assetB, update.assetA)
-                    };
-                    let pools = self
-                        .pool_registry
-                        .get_pools_by_token_pair(update.assetA, update.assetB);
-
-                    // Find the pool with matching fee (or just use the first one if no match)
-                    let pool_key = pools
-                        .iter()
-                        .find(|pk| pk.fee.to::<u32>() == update.bundleFee.to::<u32>())
-                        .or_else(|| pools.first())
-                        .cloned()
-                        .cloned();
-
-                    if let Some(pool_key) = pool_key {
-                        // Get the Uniswap pool ID from registry
-                        let angstrom_pool_id = PoolId::from(pool_key);
-                        let pool_id = self
-                            .pool_registry
-                            .private_key_from_public(&angstrom_pool_id)
-                            .unwrap();
-
-                        updates.push(PoolUpdate::FeeUpdate {
-                            pool_id,
-                            block: block_number,
-                            bundle_fee: update.bundleFee.to(),
-                            swap_fee: update.unlockedFee.to(),
-                            protocol_fee: update.protocolUnlockedFee.to()
-                        });
-                    }
-                }
-            }
-        }
-
-        updates
-    }
-
     /// Process events for a block range
     async fn process_events_for_block_range(
         &mut self,
         from_block: u64,
         to_block: u64,
         store_in_history: bool
-    ) -> Result<Vec<PoolUpdate>, PoolUpdateError> {
+    ) -> Result<Vec<PoolUpdate<T>>, PoolUpdateError> {
         let mut updates = Vec::new();
 
         // If no pools are tracked, return early
@@ -441,58 +306,9 @@ where
             }
         }
 
-        // Query controller events
-        let controller_filter = Filter::new()
-            .address(self.controller_address)
-            .from_block(from_block)
-            .to_block(to_block);
-
-        let controller_logs = self
-            .provider
-            .get_logs(&controller_filter)
-            .await
-            .map_err(|e| {
-                PoolUpdateError::Provider(format!("Failed to get controller logs: {e}"))
-            })?;
-
-        // Process controller logs
-        updates.extend(self.process_controller_logs(controller_logs));
-
-        // Process transactions to find batchUpdatePools calls
-        // For single blocks, get the block directly. For ranges, iterate.
-        if from_block == to_block {
-            let block = self
-                .provider
-                .get_block(BlockId::Number(from_block.into()))
-                .full()
-                .await
-                .map_err(|e| PoolUpdateError::Provider(format!("Failed to get block: {e}")))?
-                .ok_or_else(|| PoolUpdateError::Provider("Block not found".to_string()))?;
-
-            if let Some(transactions) = block.transactions.as_transactions() {
-                for tx in transactions {
-                    updates.extend(self.process_batch_update_pools(tx, from_block));
-                }
-            }
-        } else {
-            // For block ranges, iterate through each block
-            for block_num in from_block..=to_block {
-                let block = self
-                    .provider
-                    .get_block(BlockId::Number(block_num.into()))
-                    .full()
-                    .await
-                    .map_err(|e| PoolUpdateError::Provider(format!("Failed to get block: {e}")))?;
-
-                if let Some(block) = block
-                    && let Some(transactions) = block.transactions.as_transactions()
-                {
-                    for tx in transactions {
-                        updates.extend(self.process_batch_update_pools(tx, block_num));
-                    }
-                }
-            }
-        }
+        // Process chain specific data
+        let chain_specific_logs = self.fetch_chain_data(from_block, to_block).await?;
+        updates.extend(chain_specific_logs);
 
         Ok(updates)
     }
@@ -501,7 +317,7 @@ where
     async fn process_block_events(
         &mut self,
         block_number: u64
-    ) -> Result<Vec<PoolUpdate>, PoolUpdateError> {
+    ) -> Result<Vec<PoolUpdate<T>>, PoolUpdateError> {
         // Use the shared helper with store_in_history = true for single blocks
         self.process_events_for_block_range(block_number, block_number, true)
             .await
@@ -534,18 +350,16 @@ where
         block: u64
     ) -> Result<Slot0Data, PoolUpdateError> {
         // Get the internal pool ID from the conversion map
-        let internal_pool_id =
-            self.pool_registry
-                .conversion_map
-                .get(&pool_id)
-                .ok_or_else(|| {
-                    PoolUpdateError::Provider(format!("Pool ID {pool_id:?} not found in registry"))
-                })?;
+        let pool_id_set = self
+            .pool_registry
+            .make_pool_id_set(pool_id)
+            .ok_or_else(|| {
+                PoolUpdateError::Provider(format!("Pool ID {pool_id:?} not found in registry"))
+            })?;
 
         // Create a DataLoader for this pool
         let data_loader = DataLoader::new_with_registry(
-            *internal_pool_id,
-            pool_id,
+            pool_id_set,
             self.pool_registry.clone(),
             self.pool_manager
         );
@@ -568,7 +382,7 @@ where
         &mut self,
         from_block: u64,
         to_block: u64
-    ) -> Result<Vec<PoolUpdate>, PoolUpdateError> {
+    ) -> Result<Vec<PoolUpdate<T>>, PoolUpdateError> {
         let mut all_updates = Vec::new();
 
         // Process blocks in chunks to avoid overwhelming the provider
@@ -590,7 +404,7 @@ where
     }
 
     /// Get inverse liquidity events for reorg handling
-    fn get_inverse_liquidity_events(&self, from_block: u64, to_block: u64) -> Vec<PoolUpdate> {
+    fn get_inverse_liquidity_events(&self, from_block: u64, to_block: u64) -> Vec<PoolUpdate<T>> {
         let mut inverse_events = Vec::new();
 
         // Iterate through history in reverse order to process most recent first
@@ -621,7 +435,7 @@ where
     }
 
     /// Get pools affected by events
-    fn get_affected_pools(&self, updates: &[PoolUpdate]) -> HashSet<PoolId> {
+    fn get_affected_pools(&self, updates: &[PoolUpdate<T>]) -> HashSet<PoolId> {
         let mut affected_pools = HashSet::new();
 
         for update in updates {
@@ -629,10 +443,13 @@ where
                 PoolUpdate::SwapEvent { pool_id, .. }
                 | PoolUpdate::LiquidityEvent { pool_id, .. }
                 | PoolUpdate::UpdatedSlot0 { pool_id, .. }
-                | PoolUpdate::NewPool { pool_id, .. }
-                | PoolUpdate::PoolRemoved { pool_id, .. }
                 | PoolUpdate::FeeUpdate { pool_id, .. } => {
                     affected_pools.insert(*pool_id);
+                }
+                PoolUpdate::ChainSpecific { pool_id, update } => {
+                    if update.is_pool_affected() {
+                        affected_pools.insert(*pool_id);
+                    }
                 }
                 _ => {}
             }
@@ -647,7 +464,7 @@ where
     }
 
     /// Handle a reorg event
-    async fn handle_reorg(&mut self) -> Vec<PoolUpdate> {
+    async fn handle_reorg(&mut self) -> Vec<PoolUpdate<T>> {
         let mut updates = Vec::new();
         let reorg_start = self
             .current_block
@@ -695,15 +512,14 @@ where
                     }
                     StreamMode::InitializationOnly => {
                         // Only include initialization-related updates
-                        updates.extend(fresh_events.into_iter().filter(|update| {
-                            matches!(
-                                update,
-                                PoolUpdate::NewPool { .. }
-                                    | PoolUpdate::FeeUpdate { .. }
-                                    | PoolUpdate::UpdatedSlot0 { .. }
-                                    | PoolUpdate::NewPoolState { .. }
-                                    | PoolUpdate::PoolRemoved { .. }
-                            )
+                        updates.extend(fresh_events.into_iter().filter(|update| match update {
+                            PoolUpdate::FeeUpdate { .. }
+                            | PoolUpdate::UpdatedSlot0 { .. }
+                            | PoolUpdate::NewPoolState { .. } => true,
+                            PoolUpdate::ChainSpecific { pool_id: _, update } => {
+                                update.is_initialization_event()
+                            }
+                            _ => false
                         }));
                     }
                 }
@@ -725,9 +541,12 @@ where
         updates
     }
 
-    pub async fn on_new_block(&mut self, block: Block) -> Vec<PoolUpdate> {
+    pub async fn on_new_block(
+        &mut self,
+        block: <T as Network>::BlockResponse
+    ) -> Vec<PoolUpdate<T>> {
         let mut updates = Vec::new();
-        let block_number = block.number();
+        let block_number = block.header().number();
 
         // Check for reorg
         if block_number == self.current_block {
@@ -748,16 +567,17 @@ where
                         }
                         StreamMode::InitializationOnly => {
                             // Only include initialization-related updates
-                            updates.extend(block_updates.into_iter().filter(|update| {
-                                matches!(
-                                    update,
-                                    PoolUpdate::NewPool { .. }
-                                        | PoolUpdate::FeeUpdate { .. }
-                                        | PoolUpdate::UpdatedSlot0 { .. }
-                                        | PoolUpdate::NewPoolState { .. }
-                                        | PoolUpdate::PoolRemoved { .. }
-                                )
-                            }));
+                            updates.extend(block_updates.into_iter().filter(
+                                |update| match update {
+                                    PoolUpdate::FeeUpdate { .. }
+                                    | PoolUpdate::UpdatedSlot0 { .. }
+                                    | PoolUpdate::NewPoolState { .. } => true,
+                                    PoolUpdate::ChainSpecific { pool_id: _, update } => {
+                                        update.is_initialization_event()
+                                    }
+                                    _ => false
+                                }
+                            ));
                         }
                     }
                 }
@@ -788,7 +608,7 @@ where
 
     /// Convert PoolUpdate to StoredEvent for history
     /// Only liquidity events are stored since we re-query slot0 after reorgs
-    fn update_to_stored_event(update: &PoolUpdate) -> Option<StoredEvent> {
+    fn update_to_stored_event(update: &PoolUpdate<T>) -> Option<StoredEvent> {
         match update {
             PoolUpdate::LiquidityEvent { pool_id, block, tx_index, log_index, event } => {
                 Some(StoredEvent {
@@ -804,24 +624,31 @@ where
     }
 }
 
-pub struct StateStream<P: Provider + 'static, B>
+pub struct StateStream<P, T, B>
 where
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    P: Provider<T> + 'static,
+    T: V4Network,
+    B: Stream<Item = <T as Network>::BlockResponse> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
-    update_provider:      Option<PoolUpdateProvider<P>>,
+    update_provider:      Option<PoolUpdateProvider<P, T>>,
     block_stream:         B,
-    processing:
-        Option<Pin<Box<dyn Future<Output = (PoolUpdateProvider<P>, Vec<PoolUpdate>)> + Send>>>,
+    processing: Option<
+        Pin<Box<dyn Future<Output = (PoolUpdateProvider<P, T>, Vec<PoolUpdate<T>>)> + Send>>
+    >,
     start_tracking_pools: Vec<PoolId>,
     stop_tracking_pools:  Vec<PoolId>,
-    pool_reg:             Option<UniswapPoolRegistry>
+    pool_reg:             Option<T::PoolRegistry>
 }
 
-impl<P: Provider + 'static, B> StateStream<P, B>
+impl<P, T, B> StateStream<P, T, B>
 where
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    P: Provider<T> + 'static,
+    T: V4Network,
+    B: Stream<Item = <T as Network>::BlockResponse> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
-    pub fn new(update_provider: PoolUpdateProvider<P>, block_stream: B) -> Self {
+    pub fn new(update_provider: PoolUpdateProvider<P, T>, block_stream: B) -> Self {
         Self {
             update_provider: Some(update_provider),
             block_stream,
@@ -833,9 +660,12 @@ where
     }
 }
 
-impl<P: Provider + 'static, B> PoolEventStream for StateStream<P, B>
+impl<P, T, B> PoolEventStream<T> for StateStream<P, T, B>
 where
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    P: Provider<T> + 'static,
+    T: V4Network,
+    B: Stream<Item = <T as Network>::BlockResponse> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
     fn stop_tracking_pool(&mut self, pool_id: PoolId) {
         if let Some(update_provider) = self.update_provider.as_mut() {
@@ -853,7 +683,7 @@ where
         }
     }
 
-    fn set_pool_registry(&mut self, pool_registry: UniswapPoolRegistry) {
+    fn set_pool_registry(&mut self, pool_registry: T::PoolRegistry) {
         if let Some(update_provider) = self.update_provider.as_mut() {
             update_provider.pool_registry = pool_registry;
         } else {
@@ -862,11 +692,14 @@ where
     }
 }
 
-impl<P: Provider + 'static, B> Stream for StateStream<P, B>
+impl<P, T, B> Stream for StateStream<P, T, B>
 where
-    B: Stream<Item = Block> + Unpin + Send + 'static
+    P: Provider<T> + 'static,
+    T: V4Network,
+    B: Stream<Item = <T as Network>::BlockResponse> + Unpin + Send + 'static,
+    PoolUpdateProvider<P, T>: ProviderChainUpdate<T>
 {
-    type Item = Vec<PoolUpdate>;
+    type Item = Vec<PoolUpdate<T>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
@@ -881,7 +714,7 @@ where
             }
             this.processing = Some(processing);
 
-            return Poll::Pending
+            return Poll::Pending;
         }
 
         let updater = this.update_provider.as_mut().unwrap();
@@ -908,10 +741,366 @@ where
 
                 this.processing = Some(processing_future)
             } else {
-                return Poll::Ready(None)
+                return Poll::Ready(None);
             }
         }
 
         Poll::Pending
     }
+}
+
+/// Default number of blocks to keep in history for reorg detection
+const DEFAULT_REORG_DETECTION_BLOCKS: u64 = 10;
+
+/// Default chunk size for block processing
+const DEFAULT_REORG_LOOKBACK_BLOCK_CHUNK: u64 = 100;
+
+mod types {
+    alloy_sol_types::sol! {
+        #[derive(Debug, PartialEq, Eq)]
+        contract ControllerV1 {
+
+            event PoolConfigured(
+                address indexed asset0,
+                address indexed asset1,
+                uint16 tickSpacing,
+                uint24 bundleFee,
+                uint24 unlockedFee,
+                uint24 protocolUnlockedFee
+            );
+
+            event PoolRemoved(
+                address indexed asset0, address indexed asset1, int24 tickSpacing, uint24 feeInE6
+            );
+
+            struct PoolUpdate {
+                address assetA;
+                address assetB;
+                uint24 bundleFee;
+                uint24 unlockedFee;
+                uint24 protocolUnlockedFee;
+            }
+
+            function batchUpdatePools(PoolUpdate[] calldata updates) external;
+        }
+    }
+}
+
+impl<P> ProviderChainUpdate<Ethereum> for PoolUpdateProvider<P, Ethereum>
+where
+    P: Provider<Ethereum>
+{
+    async fn fetch_chain_data(
+        &mut self,
+        from_block: u64,
+        to_block: u64
+    ) -> Result<Vec<PoolUpdate<Ethereum>>, PoolUpdateError> {
+        let mut updates =
+            self.process_controller_logs(self.fetch_controller_logs(from_block, to_block).await?);
+
+        updates.extend(
+            self.fetch_controller_batch_updates(from_block, to_block)
+                .await?
+        );
+
+        Ok(updates)
+    }
+}
+
+impl<P> PoolUpdateProvider<P, Ethereum>
+where
+    P: Provider<Ethereum> + 'static
+{
+    async fn fetch_controller_logs(
+        &self,
+        from_block: u64,
+        to_block: u64
+    ) -> Result<Vec<alloy_rpc_types::Log>, PoolUpdateError> {
+        // Query controller events
+        let controller_filter = Filter::new()
+            .address(self.address_book().controller_v1)
+            .from_block(from_block)
+            .to_block(to_block);
+
+        let controller_logs = self
+            .provider
+            .get_logs(&controller_filter)
+            .await
+            .map_err(|e| {
+                PoolUpdateError::Provider(format!("Failed to get controller logs: {e}"))
+            })?;
+
+        Ok(controller_logs)
+    }
+
+    async fn fetch_controller_batch_updates(
+        &self,
+        from_block: u64,
+        to_block: u64
+    ) -> Result<Vec<PoolUpdate<Ethereum>>, PoolUpdateError> {
+        let mut updates = Vec::new();
+        // Process transactions to find batchUpdatePools calls
+        // For single blocks, get the block directly. For ranges, iterate.
+        if from_block == to_block {
+            let block = self
+                .provider
+                .get_block(BlockId::Number(from_block.into()))
+                .full()
+                .await
+                .map_err(|e| PoolUpdateError::Provider(format!("Failed to get block: {e}")))?
+                .ok_or_else(|| PoolUpdateError::Provider("Block not found".to_string()))?;
+
+            if let Some(transactions) = block.transactions().as_transactions() {
+                for tx in transactions {
+                    updates.extend(self.process_batch_update_pools(tx, from_block));
+                }
+            }
+        } else {
+            // For block ranges, iterate through each block
+            for block_num in from_block..=to_block {
+                let block = self
+                    .provider
+                    .get_block(BlockId::Number(block_num.into()))
+                    .full()
+                    .await
+                    .map_err(|e| PoolUpdateError::Provider(format!("Failed to get block: {e}")))?;
+
+                if let Some(block) = block
+                    && let Some(transactions) = block.transactions().as_transactions()
+                {
+                    for tx in transactions {
+                        updates.extend(self.process_batch_update_pools(tx, block_num));
+                    }
+                }
+            }
+        }
+        Ok(updates)
+    }
+
+    /// Process controller event logs
+    fn process_controller_logs(
+        &mut self,
+        logs: Vec<alloy_rpc_types::Log>
+    ) -> Vec<PoolUpdate<Ethereum>> {
+        let mut updates = Vec::new();
+
+        for log in logs {
+            let block_number = log.block_number.unwrap();
+
+            if let Ok(event) = types::ControllerV1::PoolConfigured::decode_log(&log.inner) {
+                let pool_key = PoolKey {
+                    currency0:   event.asset0,
+                    currency1:   event.asset1,
+                    fee:         event.bundleFee,
+                    tickSpacing: I24::unchecked_from(event.tickSpacing),
+                    hooks:       self.address_book().angstrom
+                };
+
+                self.pool_registry.add_new_pool(pool_key);
+
+                // Get the Uniswap pool ID from registry
+                let angstrom_pool_id = PoolId::from(pool_key);
+                let pool_id = self
+                    .pool_registry
+                    .private_key_from_public(&angstrom_pool_id)
+                    .unwrap();
+
+                updates.push(PoolUpdate::ChainSpecific {
+                    pool_id,
+                    update: L1PoolUpdate::NewPool {
+                        pool_id,
+                        token0: pool_key.currency0,
+                        token1: pool_key.currency1,
+                        bundle_fee: event.bundleFee.to(),
+                        swap_fee: event.unlockedFee.to(),
+                        protocol_fee: event.protocolUnlockedFee.to(),
+                        tick_spacing: event.tickSpacing as i32,
+                        block: block_number
+                    }
+                });
+            }
+
+            if let Ok(event) = types::ControllerV1::PoolRemoved::decode_log(&log.inner) {
+                let pool_key = PoolKey {
+                    currency0:   event.asset0,
+                    currency1:   event.asset1,
+                    fee:         event.feeInE6,
+                    tickSpacing: event.tickSpacing,
+                    hooks:       self.address_book().angstrom
+                };
+
+                // Get the Uniswap pool ID from registry
+                let angstrom_pool_id = PoolId::from(pool_key);
+                let pool_id = self
+                    .pool_registry
+                    .private_key_from_public(&angstrom_pool_id)
+                    .unwrap();
+
+                updates.push(PoolUpdate::ChainSpecific {
+                    pool_id,
+                    update: L1PoolUpdate::PoolRemoved { pool_id, block: block_number }
+                });
+            }
+        }
+
+        updates
+    }
+
+    /// Process batch update pools from transaction
+    fn process_batch_update_pools(
+        &self,
+        tx: &alloy_rpc_types::Transaction,
+        block_number: u64
+    ) -> Vec<PoolUpdate<Ethereum>> {
+        let mut updates = Vec::new();
+
+        // Check if transaction is to the controller
+        if tx.to() == Some(self.address_book().controller_v1) {
+            // Try to decode as batchUpdatePools call
+            if let Ok(call) = types::ControllerV1::batchUpdatePoolsCall::abi_decode(tx.input()) {
+                for update in call.updates {
+                    // Normalize asset order
+                    let (_asset0, _asset1) = if update.assetB > update.assetA {
+                        (update.assetA, update.assetB)
+                    } else {
+                        (update.assetB, update.assetA)
+                    };
+                    let pools = self.pool_registry.get_pools_by_token_pair(
+                        update.assetA,
+                        update.assetB,
+                        Some(self.address_book().angstrom)
+                    );
+
+                    // Find the pool with matching fee tier
+                    let pool_key = pools
+                        .iter()
+                        .find(|pk| pk.fee.to::<u32>() == update.bundleFee.to::<u32>())
+                        .cloned()
+                        .cloned();
+
+                    if pool_key.is_none() && !pools.is_empty() {
+                        tracing::warn!(
+                            "No pool found matching fee tier {} for token pair ({}, {}), skipping \
+                             fee update",
+                            update.bundleFee,
+                            update.assetA,
+                            update.assetB
+                        );
+                    }
+
+                    if let Some(pool_key) = pool_key {
+                        // Get the Uniswap pool ID from registry
+                        let angstrom_pool_id = PoolId::from(pool_key);
+                        let pool_id = self
+                            .pool_registry
+                            .private_key_from_public(&angstrom_pool_id)
+                            .unwrap();
+
+                        updates.push(PoolUpdate::FeeUpdate {
+                            pool_id,
+                            block: block_number,
+                            update: L1FeeUpdate {
+                                bundle_fee:   update.bundleFee.to(),
+                                swap_fee:     update.unlockedFee.to(),
+                                protocol_fee: update.protocolUnlockedFee.to()
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        updates
+    }
+}
+
+pub async fn fetch_angstrom_pools<P>(
+    mut deploy_block: u64,
+    end_block: u64,
+    angstrom_address: Address,
+    controller_address: Address,
+    db: &P
+) -> Vec<PoolKeyWithFees<L1FeeConfiguration>>
+where
+    P: Provider<Ethereum>
+{
+    let mut filters = vec![];
+
+    loop {
+        let this_end_block = std::cmp::min(deploy_block + 99_999, end_block);
+
+        if this_end_block == deploy_block {
+            break;
+        }
+
+        tracing::info!(?deploy_block, ?this_end_block);
+        let filter = Filter::new()
+            .from_block(deploy_block)
+            .to_block(this_end_block)
+            .address(controller_address);
+
+        filters.push(filter);
+
+        deploy_block = std::cmp::min(end_block, this_end_block);
+    }
+
+    let logs = futures::stream::iter(filters)
+        .map(|filter| async move {
+            db.get_logs(&filter)
+                .await
+                .unwrap()
+                .into_iter()
+                .collect::<Vec<_>>()
+        })
+        .buffered(10)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+
+    logs.into_iter()
+        .fold(HashMap::new(), |mut set, log| {
+            if let Ok(pool) =
+                types::ControllerV1::PoolConfigured::decode_log(&log.clone().into_inner())
+            {
+                let pool_key_with_fees = PoolKeyWithFees {
+                    pool_key: PoolKey {
+                        currency0:   pool.asset0,
+                        currency1:   pool.asset1,
+                        fee:         pool.bundleFee,
+                        tickSpacing: I24::unchecked_from(pool.tickSpacing),
+                        hooks:       angstrom_address
+                    },
+                    fee_cfg:  L1FeeConfiguration {
+                        bundle_fee:   pool.bundleFee.to(),
+                        swap_fee:     pool.unlockedFee.to(),
+                        protocol_fee: pool.protocolUnlockedFee.to()
+                    }
+                };
+
+                let mut raw = pool_key_with_fees.pool_key;
+                raw.fee = Default::default();
+
+                set.insert(raw, pool_key_with_fees);
+                return set;
+            }
+
+            if let Ok(pool) =
+                types::ControllerV1::PoolRemoved::decode_log(&log.clone().into_inner())
+            {
+                let remove_key = PoolKey {
+                    currency0:   pool.asset0,
+                    currency1:   pool.asset1,
+                    fee:         Default::default(),
+                    tickSpacing: pool.tickSpacing,
+                    hooks:       angstrom_address
+                };
+                set.remove(&remove_key);
+                return set;
+            }
+            set
+        })
+        .into_values()
+        .collect::<Vec<_>>()
 }

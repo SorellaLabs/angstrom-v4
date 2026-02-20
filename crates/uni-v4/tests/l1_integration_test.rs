@@ -11,17 +11,21 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
     rpc::types::Block
 };
-use angstrom_v4::{PoolId, sqrt_pricex96::SqrtPriceX96, tick_info::TickInfo};
 use futures::Stream;
+use uni_v4::{
+    L1AddressBook, PoolId,
+    pool_providers::update_provider::{PoolUpdateProvider, StateStream},
+    pool_registry::L1PoolRegistry,
+    sqrt_pricex96::SqrtPriceX96,
+    tick_info::TickInfo
+};
 use uni_v4_upkeeper::{
-    pool_manager_service_builder::PoolManagerServiceBuilder,
-    pool_providers::pool_update_provider::{PoolUpdateProvider, StateStream},
-    pool_registry::UniswapPoolRegistry,
-    slot0::NoOpSlot0Stream
+    pool_manager_service_builder::PoolManagerServiceBuilder, slot0::NoOpSlot0Stream
 };
 
 // Test configuration - Uses ETH_URL environment variable
-fn get_eth_url() -> Option<String> {
+pub fn get_eth_url() -> Option<String> {
+    dotenv::dotenv().ok();
     std::env::var("ETH_URL").ok()
 }
 
@@ -111,8 +115,8 @@ async fn test_pool_state_consistency() {
     let pool_manager_address =
         alloy::primitives::address!("0x000000000004444c5dc75cB358380D2e3dE08A90");
 
-    // Set the controller address for the fetch function
-    uni_v4_upkeeper::fetch_pool_keys::set_controller_address(controller_address);
+    let address_book = L1AddressBook::new(controller_address, angstrom_address);
+    let pool_registry = L1PoolRegistry::new(angstrom_address);
 
     // Create real provider
     let provider = Arc::new(
@@ -132,9 +136,8 @@ async fn test_pool_state_consistency() {
     let update_provider = PoolUpdateProvider::new_at_block(
         provider.clone(),
         pool_manager_address,
-        controller_address,
-        angstrom_address,
-        UniswapPoolRegistry::default(),
+        address_book,
+        pool_registry.clone(),
         initial_block
     );
 
@@ -142,8 +145,8 @@ async fn test_pool_state_consistency() {
     // Use the builder to create service with all discovered pools
     let mut service1 = PoolManagerServiceBuilder::<_, _, _, NoOpSlot0Stream>::new(
         provider.clone(),
-        angstrom_address,
-        controller_address,
+        address_book,
+        pool_registry.clone(),
         pool_manager_address,
         deploy_block,
         state_stream
@@ -219,8 +222,8 @@ async fn test_pool_state_consistency() {
 
     let service2 = PoolManagerServiceBuilder::new_with_noop_stream(
         provider.clone(),
-        angstrom_address,
-        controller_address,
+        address_book,
+        pool_registry,
         pool_manager_address,
         deploy_block
     )

@@ -6,15 +6,18 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-# External dependencies
-alloy-contract.workspace = true
 alloy-primitives.workspace = true
-alloy-sol-types.workspace = true
 dashmap.workspace = true
 eyre.workspace = true
-serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-tracing.workspace = true
 uni-v4-structure.workspace = true
 uniswap_v3_math.workspace = true
+alloy-contract.workspace = true
+alloy-sol-types.workspace = true
+
+
+[features]
+# default = []
+default = ["l2"]
+l2 = ["uni-v4-structure/l2"]

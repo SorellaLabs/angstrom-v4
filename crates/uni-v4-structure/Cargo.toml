@@ -12,3 +12,12 @@ itertools.workspace = true
 malachite.workspace = true
 serde.workspace = true
 uniswap_v3_math.workspace = true
+alloy-network.workspace = true
+op-alloy-network = { workspace = true, optional = true }
+alloy-sol-types.workspace = true
+
+
+[features]
+# default = []
+default = ["l2"]
+l2 = ["dep:op-alloy-network"]
