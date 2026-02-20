@@ -1,10 +1,11 @@
+use alloy_primitives::aliases::{I24, U24};
 use alloy_provider::Provider;
 use futures::Stream;
 use op_alloy_network::Optimism;
 use uni_v4_common::PoolUpdate;
 use uni_v4_structure::{
-    L2FeeConfiguration, PoolId, l2_structure::pool_updates::L2PoolUpdate,
-    pool_registry::PoolRegistry, pool_updates::Slot0Update
+    L2FeeConfiguration, PoolId, PoolKey, l2_structure::pool_updates::L2PoolUpdate,
+    pool_updates::Slot0Update
 };
 
 use crate::{
@@ -26,32 +27,41 @@ where
         match update {
             L2PoolUpdate::NewPool {
                 pool_id,
+                token0,
+                token1,
+                hook,
+                hook_fee,
+                tick_spacing,
                 block,
                 creator_tax_fee_e6,
                 protocol_tax_fee_e6,
                 creator_swap_fee_e6,
                 protocol_swap_fee_e6,
                 priority_fee_tax_floor,
+                jit_tax_enabled,
+                withdraw_only,
                 ..
             } => {
                 if self.auto_pool_creation {
+                    let pool_key = PoolKey {
+                        currency0:   *token0,
+                        currency1:   *token1,
+                        fee:         U24::from(*hook_fee),
+                        tickSpacing: I24::unchecked_from(*tick_spacing),
+                        hooks:       *hook
+                    };
                     let fee_cfg = L2FeeConfiguration {
                         is_initialized:         true,
                         creator_tax_fee_e6:     *creator_tax_fee_e6,
                         protocol_tax_fee_e6:    *protocol_tax_fee_e6,
                         creator_swap_fee_e6:    *creator_swap_fee_e6,
                         protocol_swap_fee_e6:   *protocol_swap_fee_e6,
-                        priority_fee_tax_floor: *priority_fee_tax_floor
+                        priority_fee_tax_floor: *priority_fee_tax_floor,
+                        jit_tax_enabled:        *jit_tax_enabled,
+                        withdraw_only:          *withdraw_only
                     };
-                    // Reconstruct pool_key from the NewPool data
-                    // We need to get the pool_key from the registry
-                    if let Some(pool_key) = self.factory.registry().get(pool_id) {
-                        self.handle_new_pool(*pool_key, *block, fee_cfg);
-
-                        tracing::info!("Pool configured: {pool_id:?}:\n{fee_cfg:?}",);
-                    } else {
-                        tracing::warn!("Pool {:?} not found in registry", pool_id);
-                    }
+                    self.handle_new_pool(pool_key, *block, fee_cfg);
+                    tracing::info!("Pool configured: {pool_id:?}:\n{fee_cfg:?}");
                 } else {
                     tracing::info!(
                         "Ignoring pool configured event (auto creation disabled): {:?}",

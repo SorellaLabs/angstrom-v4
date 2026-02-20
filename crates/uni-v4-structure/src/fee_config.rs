@@ -24,7 +24,9 @@ pub struct L2FeeConfiguration {
     pub protocol_tax_fee_e6:    u32,
     pub creator_swap_fee_e6:    u32,
     pub protocol_swap_fee_e6:   u32,
-    pub priority_fee_tax_floor: u128
+    pub priority_fee_tax_floor: u128,
+    pub jit_tax_enabled:        bool,
+    pub withdraw_only:          bool
 }
 
 pub trait FeeConfig:
@@ -48,6 +50,10 @@ pub trait FeeConfig:
     /// - L1 unlocked mode: swap_fee + protocol_fee
     /// - L2: swap_fee (0) + protocol_fee (creator + protocol swap fees)
     fn fee(&self, bundle: bool) -> u32;
+
+    fn priority_fee_tax_floor(&self) -> u128 {
+        0
+    }
 
     fn update_fees(&mut self, update: Self::Update);
 
@@ -110,20 +116,25 @@ impl FeeConfig for L2FeeConfiguration {
         self.swap_fee() + self.protocol_fee()
     }
 
-    fn update_fees(&mut self, update: Self::Update) {
-        let Self::Update { protocol_tax_fee_e6, protocol_swap_fee_e6, priority_fee_tax_floor } =
-            update;
+    fn priority_fee_tax_floor(&self) -> u128 {
+        self.priority_fee_tax_floor
+    }
 
-        if let Some(fee) = protocol_tax_fee_e6 {
+    fn update_fees(&mut self, update: Self::Update) {
+        if let Some(fee) = update.protocol_tax_fee_e6 {
             self.protocol_tax_fee_e6 = fee;
         }
-
-        if let Some(fee) = protocol_swap_fee_e6 {
+        if let Some(fee) = update.protocol_swap_fee_e6 {
             self.protocol_swap_fee_e6 = fee;
         }
-
-        if let Some(floor) = priority_fee_tax_floor {
+        if let Some(floor) = update.priority_fee_tax_floor {
             self.priority_fee_tax_floor = floor;
+        }
+        if let Some(enabled) = update.jit_tax_enabled {
+            self.jit_tax_enabled = enabled;
+        }
+        if let Some(wo) = update.withdraw_only {
+            self.withdraw_only = wo;
         }
     }
 
@@ -148,7 +159,9 @@ pub struct L1FeeUpdate {
 pub struct L2FeeUpdate {
     pub protocol_tax_fee_e6:    Option<u32>,
     pub protocol_swap_fee_e6:   Option<u32>,
-    pub priority_fee_tax_floor: Option<u128>
+    pub priority_fee_tax_floor: Option<u128>,
+    pub jit_tax_enabled:        Option<bool>,
+    pub withdraw_only:          Option<bool>
 }
 
 #[cfg(test)]
@@ -162,7 +175,9 @@ mod tests {
             protocol_tax_fee_e6:    2000,
             creator_swap_fee_e6:    3000,
             protocol_swap_fee_e6:   4000,
-            priority_fee_tax_floor: floor
+            priority_fee_tax_floor: floor,
+            jit_tax_enabled:        false,
+            withdraw_only:          false
         }
     }
 
@@ -210,7 +225,9 @@ mod tests {
         cfg.update_fees(L2FeeUpdate {
             protocol_tax_fee_e6:    None,
             protocol_swap_fee_e6:   None,
-            priority_fee_tax_floor: Some(42)
+            priority_fee_tax_floor: Some(42),
+            jit_tax_enabled:        None,
+            withdraw_only:          None
         });
         assert_eq!(cfg.priority_fee_tax_floor, 42);
     }
@@ -221,7 +238,9 @@ mod tests {
         cfg.update_fees(L2FeeUpdate {
             protocol_tax_fee_e6:    Some(9999),
             protocol_swap_fee_e6:   None,
-            priority_fee_tax_floor: None
+            priority_fee_tax_floor: None,
+            jit_tax_enabled:        None,
+            withdraw_only:          None
         });
         assert_eq!(cfg.priority_fee_tax_floor, 100);
         assert_eq!(cfg.protocol_tax_fee_e6, 9999);
@@ -233,10 +252,14 @@ mod tests {
         cfg.update_fees(L2FeeUpdate {
             protocol_tax_fee_e6:    Some(111),
             protocol_swap_fee_e6:   Some(222),
-            priority_fee_tax_floor: Some(333)
+            priority_fee_tax_floor: Some(333),
+            jit_tax_enabled:        Some(true),
+            withdraw_only:          Some(true)
         });
         assert_eq!(cfg.protocol_tax_fee_e6, 111);
         assert_eq!(cfg.protocol_swap_fee_e6, 222);
         assert_eq!(cfg.priority_fee_tax_floor, 333);
+        assert!(cfg.jit_tax_enabled);
+        assert!(cfg.withdraw_only);
     }
 }

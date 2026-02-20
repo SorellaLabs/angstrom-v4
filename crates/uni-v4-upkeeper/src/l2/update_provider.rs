@@ -53,7 +53,9 @@ mod types {
 
             event ProtocolSwapFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);
             event ProtocolTaxFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);
+            event JITTaxStatusUpdated(address indexed hook, bool newJITTaxEnabled);
             event PriorityFeeTaxFloorUpdated(address indexed hook, uint256 newPriorityFeeTaxFloor);
+            event WithdrawOnly();
         }
 
         #[derive(Debug)]
@@ -155,6 +157,20 @@ where
         logs: Vec<alloy_rpc_types::Log>,
         hook_floors: &HashMap<Address, u128>
     ) -> Vec<PoolUpdate<Optimism>> {
+        // Pre-scan: collect hook-level state that may precede PoolCreated in
+        // the same block. Without this, JITTaxStatusUpdated / WithdrawOnly
+        // events emitted before PoolCreated would be lost because the pool
+        // isn't in the registry yet when those events are processed.
+        let mut hook_jit_tax: HashMap<Address, bool> = HashMap::new();
+        let mut global_withdraw_only = false;
+        for log in &logs {
+            if let Ok(event) = AngstromL2Factory::JITTaxStatusUpdated::decode_log(&log.inner) {
+                hook_jit_tax.insert(event.hook, event.data.newJITTaxEnabled);
+            } else if AngstromL2Factory::WithdrawOnly::decode_log(&log.inner).is_ok() {
+                global_withdraw_only = true;
+            }
+        }
+
         let mut updates = Vec::new();
 
         let registry = self.pool_registry_mut();
@@ -189,7 +205,9 @@ where
                         protocol_tax_fee_e6: event.protocolTaxFeeE6.to(),
                         creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
                         protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
-                        priority_fee_tax_floor: floor
+                        priority_fee_tax_floor: floor,
+                        jit_tax_enabled: hook_jit_tax.get(&event.hook).copied().unwrap_or(false),
+                        withdraw_only: global_withdraw_only
                     }
                 });
             } else if let Ok(event) =
@@ -203,7 +221,9 @@ where
                     update: L2FeeUpdate {
                         protocol_tax_fee_e6:    None,
                         protocol_swap_fee_e6:   Some(event.data.newFeeE6.to()),
-                        priority_fee_tax_floor: None
+                        priority_fee_tax_floor: None,
+                        jit_tax_enabled:        None,
+                        withdraw_only:          None
                     }
                 })
             } else if let Ok(event) =
@@ -217,25 +237,55 @@ where
                     update: L2FeeUpdate {
                         protocol_tax_fee_e6:    Some(event.data.newFeeE6.to()),
                         protocol_swap_fee_e6:   None,
-                        priority_fee_tax_floor: None
+                        priority_fee_tax_floor: None,
+                        jit_tax_enabled:        None,
+                        withdraw_only:          None
                     }
                 })
-            } else if let Ok(event) =
-                AngstromL2Factory::PriorityFeeTaxFloorUpdated::decode_log(&log.inner)
+            } else if let Ok(event) = AngstromL2Factory::JITTaxStatusUpdated::decode_log(&log.inner)
             {
-                let hook_addr = event.hook;
-                let new_floor: u128 = event.newPriorityFeeTaxFloor.to();
-
-                // Update all pools belonging to this hook
-                let hook_pools = registry.pools(Some(hook_addr));
-                for (pool_id, _) in hook_pools {
+                let hook_address = event.hook;
+                for (pool_id, _) in registry.pools(Some(hook_address)) {
                     updates.push(PoolUpdate::FeeUpdate {
                         pool_id,
                         block: block_number,
                         update: L2FeeUpdate {
                             protocol_tax_fee_e6:    None,
                             protocol_swap_fee_e6:   None,
-                            priority_fee_tax_floor: Some(new_floor)
+                            priority_fee_tax_floor: None,
+                            jit_tax_enabled:        Some(event.data.newJITTaxEnabled),
+                            withdraw_only:          None
+                        }
+                    });
+                }
+            } else if let Ok(event) =
+                AngstromL2Factory::PriorityFeeTaxFloorUpdated::decode_log(&log.inner)
+            {
+                let hook_address = event.hook;
+                for (pool_id, _) in registry.pools(Some(hook_address)) {
+                    updates.push(PoolUpdate::FeeUpdate {
+                        pool_id,
+                        block: block_number,
+                        update: L2FeeUpdate {
+                            protocol_tax_fee_e6:    None,
+                            protocol_swap_fee_e6:   None,
+                            priority_fee_tax_floor: Some(event.data.newPriorityFeeTaxFloor.to()),
+                            jit_tax_enabled:        None,
+                            withdraw_only:          None
+                        }
+                    });
+                }
+            } else if AngstromL2Factory::WithdrawOnly::decode_log(&log.inner).is_ok() {
+                for (pool_id, _) in registry.pools(None) {
+                    updates.push(PoolUpdate::FeeUpdate {
+                        pool_id,
+                        block: block_number,
+                        update: L2FeeUpdate {
+                            protocol_tax_fee_e6:    None,
+                            protocol_swap_fee_e6:   None,
+                            priority_fee_tax_floor: None,
+                            jit_tax_enabled:        None,
+                            withdraw_only:          Some(true)
                         }
                     });
                 }
@@ -302,6 +352,19 @@ where
 
     let hook_floors = fetch_hook_floors(db, hook_addrs).await;
 
+    // Track per-hook state for JIT tax and priority fee floor from events
+    let mut hook_jit_tax: HashMap<Address, bool> = HashMap::new();
+    let mut global_withdraw_only = false;
+
+    // First pass: collect hook-level and factory-level settings
+    for log in &logs {
+        if let Ok(event) = AngstromL2Factory::JITTaxStatusUpdated::decode_log(&log.inner) {
+            hook_jit_tax.insert(event.hook, event.data.newJITTaxEnabled);
+        } else if AngstromL2Factory::WithdrawOnly::decode_log(&log.inner).is_ok() {
+            global_withdraw_only = true;
+        }
+    }
+
     let all_updates = logs.into_iter().filter_map(|log| {
         let block_number = log.block_number.unwrap();
 
@@ -330,7 +393,9 @@ where
                     protocol_tax_fee_e6: event.protocolTaxFeeE6.to(),
                     creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
                     protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
-                    priority_fee_tax_floor: floor
+                    priority_fee_tax_floor: floor,
+                    jit_tax_enabled: hook_jit_tax.get(&event.hook).copied().unwrap_or(false),
+                    withdraw_only: global_withdraw_only
                 }
             })
         } else if let Ok(event) = AngstromL2Factory::ProtocolSwapFeeUpdated::decode_log(&log.inner)
@@ -343,7 +408,9 @@ where
                 update: L2FeeUpdate {
                     protocol_tax_fee_e6:    None,
                     protocol_swap_fee_e6:   Some(event.data.newFeeE6.to()),
-                    priority_fee_tax_floor: None
+                    priority_fee_tax_floor: None,
+                    jit_tax_enabled:        None,
+                    withdraw_only:          None
                 }
             })
         } else if let Ok(event) = AngstromL2Factory::ProtocolTaxFeeUpdated::decode_log(&log.inner) {
@@ -355,14 +422,16 @@ where
                 update: L2FeeUpdate {
                     protocol_tax_fee_e6:    Some(event.data.newFeeE6.to()),
                     protocol_swap_fee_e6:   None,
-                    priority_fee_tax_floor: None
+                    priority_fee_tax_floor: None,
+                    jit_tax_enabled:        None,
+                    withdraw_only:          None
                 }
             })
         } else {
-            // PriorityFeeTaxFloorUpdated events are intentionally dropped during
-            // startup replay. The floor values are already fetched from the latest
-            // on-chain state via fetch_hook_floors() RPC calls above, so any
-            // intermediate floor-change events in the log history are stale.
+            // PriorityFeeTaxFloorUpdated events are dropped — floor values come from
+            // latest on-chain state via fetch_hook_floors() RPC calls above.
+            // JITTaxStatusUpdated and WithdrawOnly events are dropped — their state
+            // is collected in the first pass and applied during pool construction.
             None
         }
     });
@@ -414,6 +483,8 @@ where
                 hook_fee,
                 hook,
                 priority_fee_tax_floor,
+                jit_tax_enabled,
+                withdraw_only,
                 ..
             } => {
                 let pool_key_with_fees = PoolKeyWithFees {
@@ -430,7 +501,9 @@ where
                         protocol_tax_fee_e6,
                         creator_swap_fee_e6,
                         protocol_swap_fee_e6,
-                        priority_fee_tax_floor
+                        priority_fee_tax_floor,
+                        jit_tax_enabled,
+                        withdraw_only
                     }
                 };
                 pool_keys.insert(pool_id, pool_key_with_fees);

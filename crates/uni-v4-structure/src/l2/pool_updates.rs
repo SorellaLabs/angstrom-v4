@@ -17,7 +17,9 @@ pub enum L2PoolUpdate {
         tick_spacing:           i32,
         hook:                   Address,
         block:                  u64,
-        priority_fee_tax_floor: u128
+        priority_fee_tax_floor: u128,
+        jit_tax_enabled:        bool,
+        withdraw_only:          bool
     }
 }
 
