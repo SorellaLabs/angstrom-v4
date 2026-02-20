@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(cfg.protocol_tax_fee_e6, 111);
         assert_eq!(cfg.protocol_swap_fee_e6, 222);
         assert_eq!(cfg.priority_fee_tax_floor, 333);
-        assert_eq!(cfg.jit_tax_enabled, true);
-        assert_eq!(cfg.withdraw_only, true);
+        assert!(cfg.jit_tax_enabled);
+        assert!(cfg.withdraw_only);
     }
 }

@@ -206,10 +206,7 @@ where
                         creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
                         protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
                         priority_fee_tax_floor: floor,
-                        jit_tax_enabled: hook_jit_tax
-                            .get(&event.hook)
-                            .copied()
-                            .unwrap_or(false),
+                        jit_tax_enabled: hook_jit_tax.get(&event.hook).copied().unwrap_or(false),
                         withdraw_only: global_withdraw_only
                     }
                 });
@@ -245,8 +242,7 @@ where
                         withdraw_only:          None
                     }
                 })
-            } else if let Ok(event) =
-                AngstromL2Factory::JITTaxStatusUpdated::decode_log(&log.inner)
+            } else if let Ok(event) = AngstromL2Factory::JITTaxStatusUpdated::decode_log(&log.inner)
             {
                 let hook_address = event.hook;
                 for (pool_id, _) in registry.pools(Some(hook_address)) {
@@ -398,10 +394,7 @@ where
                     creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
                     protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
                     priority_fee_tax_floor: floor,
-                    jit_tax_enabled: hook_jit_tax
-                        .get(&event.hook)
-                        .copied()
-                        .unwrap_or(false),
+                    jit_tax_enabled: hook_jit_tax.get(&event.hook).copied().unwrap_or(false),
                     withdraw_only: global_withdraw_only
                 }
             })
