@@ -36,17 +36,18 @@ async fn main() -> Result<()> {
     let address_book = L1AddressBook::new(controller_address, angstrom_address);
     let pool_registry = L1PoolRegistry::new(angstrom_address);
 
-    let service = PoolManagerServiceBuilder::<_, _, NoOpEventStream<Ethereum>, NoOpSlot0Stream>::new(
-        provider.clone(),
-        address_book,
-        pool_registry,
-        pool_manager_address,
-        deploy_block,
-        NoOpEventStream::<Ethereum>::default()
-    )
-    .with_update_channel(tx)
-    .build()
-    .await?;
+    let service =
+        PoolManagerServiceBuilder::<_, _, NoOpEventStream<Ethereum>, NoOpSlot0Stream>::new(
+            provider.clone(),
+            address_book,
+            pool_registry,
+            pool_manager_address,
+            deploy_block,
+            NoOpEventStream::<Ethereum>::default()
+        )
+        .with_update_channel(tx)
+        .build()
+        .await?;
 
     println!("✅ Service created successfully in channel mode!");
 

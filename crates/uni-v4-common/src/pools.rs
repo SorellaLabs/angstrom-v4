@@ -61,11 +61,18 @@ impl<T: V4Network> UniswapPools<T> {
     }
 
     pub async fn wait_for_next_slot0_update(&self, pool_id: PoolId) {
-        self.slot0_notifiers.get(&pool_id).unwrap().notified().await;
+        self.slot0_notifiers
+            .get(&pool_id)
+            .expect("slot0 notifier missing for pool_id — pool not yet registered")
+            .notified()
+            .await;
     }
 
     pub async fn notify_slot0_waiters(&self, pool_id: PoolId) {
-        self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
+        self.slot0_notifiers
+            .get(&pool_id)
+            .expect("slot0 notifier missing for pool_id — pool not yet registered")
+            .notify_waiters();
     }
 
     pub fn get_pool(&self, pool_id: &PoolId) -> Option<Ref<'_, PoolId, BaselinePoolState<T>>> {
@@ -87,7 +94,7 @@ impl<T: V4Network> UniswapPools<T> {
     pub async fn next_slot0_update_future_owned(&self, pool_id: PoolId) -> OwnedNotified {
         self.slot0_notifiers
             .get(&pool_id)
-            .unwrap()
+            .expect("slot0 notifier missing for pool_id — pool not yet registered")
             .clone()
             .notified_owned()
     }
@@ -148,7 +155,9 @@ impl<T: V4Network> UniswapPools<T> {
                     let state = pool.value_mut();
                     state.update_slot0(data.tick, data.sqrt_price_x96.into(), data.liquidity);
 
-                    self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
+                    if let Some(notifier) = self.slot0_notifiers.get(&pool_id) {
+                        notifier.notify_waiters();
+                    }
                 }
                 PoolUpdate::NewTicks { pool_id, ticks, tick_bitmap } => {
                     let Some(mut pool) = self.pools.get_mut(&pool_id) else {
@@ -170,26 +179,6 @@ impl<T: V4Network> UniswapPools<T> {
                     self.slot0_notifiers
                         .insert(pool_id, Arc::new(Notify::new()));
                 }
-                // PoolUpdate::Slot0Update(update) => {
-                //     if update.current_block != current_block_number {
-                //         continue;
-                //     }
-
-                //     let Some(mut pool) = self.pools.get_mut(&update.angstrom_pool_id) else {
-                //         continue;
-                //     };
-
-                //     pool.value_mut().update_slot0(
-                //         update.tick,
-                //         update.sqrt_price_x96.into(),
-                //         update.liquidity
-                //     );
-
-                //     self.slot0_notifiers
-                //         .get(&update.angstrom_pool_id)
-                //         .unwrap()
-                //         .notify_waiters();
-                // }
                 PoolUpdate::ChainSpecific { pool_id, update } => {
                     if !update.valid_current_block(current_block_number) {
                         continue;
@@ -203,8 +192,8 @@ impl<T: V4Network> UniswapPools<T> {
 
                     pool.update_chain_specific(update);
 
-                    if should_notify {
-                        self.slot0_notifiers.get(&pool_id).unwrap().notify_waiters();
+                    if should_notify && let Some(notifier) = self.slot0_notifiers.get(&pool_id) {
+                        notifier.notify_waiters();
                     }
                 }
             }

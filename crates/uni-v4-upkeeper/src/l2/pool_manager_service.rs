@@ -31,15 +31,17 @@ where
                 protocol_tax_fee_e6,
                 creator_swap_fee_e6,
                 protocol_swap_fee_e6,
+                priority_fee_tax_floor,
                 ..
             } => {
                 if self.auto_pool_creation {
                     let fee_cfg = L2FeeConfiguration {
-                        is_initialized:       true,
-                        creator_tax_fee_e6:   *creator_tax_fee_e6,
-                        protocol_tax_fee_e6:  *protocol_tax_fee_e6,
-                        creator_swap_fee_e6:  *creator_swap_fee_e6,
-                        protocol_swap_fee_e6: *protocol_swap_fee_e6
+                        is_initialized:         true,
+                        creator_tax_fee_e6:     *creator_tax_fee_e6,
+                        protocol_tax_fee_e6:    *protocol_tax_fee_e6,
+                        creator_swap_fee_e6:    *creator_swap_fee_e6,
+                        protocol_swap_fee_e6:   *protocol_swap_fee_e6,
+                        priority_fee_tax_floor: *priority_fee_tax_floor
                     };
                     // Reconstruct pool_key from the NewPool data
                     // We need to get the pool_key from the registry

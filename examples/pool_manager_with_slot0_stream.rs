@@ -1,12 +1,12 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
+use alloy_network::Ethereum;
 use alloy_primitives::address;
 use alloy_provider::ProviderBuilder;
 use jsonrpsee::ws_client::WsClientBuilder;
-use alloy_network::Ethereum;
-use uni_v4_structure::{PoolId, pool_registry::L1PoolRegistry, L1AddressBook};
+use uni_v4_structure::{L1AddressBook, PoolId, pool_registry::L1PoolRegistry};
 use uni_v4_upkeeper::{
-    pool_manager_service_builder::{PoolManagerServiceBuilder, NoOpEventStream},
+    pool_manager_service_builder::{NoOpEventStream, PoolManagerServiceBuilder},
     slot0::{NoOpSlot0Stream, Slot0Client}
 };
 

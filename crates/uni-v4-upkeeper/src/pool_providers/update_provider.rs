@@ -714,7 +714,7 @@ where
             }
             this.processing = Some(processing);
 
-            return Poll::Pending
+            return Poll::Pending;
         }
 
         let updater = this.update_provider.as_mut().unwrap();
@@ -741,7 +741,7 @@ where
 
                 this.processing = Some(processing_future)
             } else {
-                return Poll::Ready(None)
+                return Poll::Ready(None);
             }
         }
 
@@ -971,13 +971,22 @@ where
                         Some(self.address_book().angstrom)
                     );
 
-                    // Find the pool with matching fee (or just use the first one if no match)
+                    // Find the pool with matching fee tier
                     let pool_key = pools
                         .iter()
                         .find(|pk| pk.fee.to::<u32>() == update.bundleFee.to::<u32>())
-                        .or_else(|| pools.first())
                         .cloned()
                         .cloned();
+
+                    if pool_key.is_none() && !pools.is_empty() {
+                        tracing::warn!(
+                            "No pool found matching fee tier {} for token pair ({}, {}), skipping \
+                             fee update",
+                            update.bundleFee,
+                            update.assetA,
+                            update.assetB
+                        );
+                    }
 
                     if let Some(pool_key) = pool_key {
                         // Get the Uniswap pool ID from registry

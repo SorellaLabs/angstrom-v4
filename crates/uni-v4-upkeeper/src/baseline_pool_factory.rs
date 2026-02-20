@@ -3,10 +3,7 @@ use std::{
     sync::Arc
 };
 
-use alloy_primitives::{
-    Address, U256,
-    aliases::I24
-};
+use alloy_primitives::{Address, U256, aliases::I24};
 use alloy_provider::Provider;
 use dashmap::DashMap;
 use futures::{Stream, StreamExt, future::BoxFuture, stream::FuturesUnordered};
@@ -136,7 +133,7 @@ where
     }
 
     pub fn is_processing(&self) -> bool {
-        !(self.tick_loading.is_empty() || self.pool_generator.is_empty())
+        !(self.tick_loading.is_empty() && self.pool_generator.is_empty())
     }
 
     pub fn registry(&self) -> T::PoolRegistry {
@@ -834,7 +831,9 @@ impl<P: Provider<T> + Clone + Unpin + 'static, T: V4Network> Stream for Baseline
         while let std::task::Poll::Ready(Some(result)) = this.pool_generator.poll_next_unpin(cx) {
             match result {
                 Ok((pool_id, pool_state)) => {
-                    return std::task::Poll::Ready(Some(UpdateMessage::NewPool(pool_id, pool_state)))
+                    return std::task::Poll::Ready(Some(UpdateMessage::NewPool(
+                        pool_id, pool_state
+                    )));
                 }
                 Err(e) => {
                     // Log error but continue processing other futures

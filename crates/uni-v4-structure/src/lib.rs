@@ -8,8 +8,7 @@ use sqrt_pricex96::SqrtPriceX96;
 
 use crate::fee_config::FeeConfig;
 pub use crate::fee_config::{
-    L1FeeConfiguration, L2_SWAP_MEV_TAX_FACTOR, L2_SWAP_TAXED_GAS, L2FeeConfiguration,
-    calculate_l2_mev_tax
+    L1FeeConfiguration, L2_SWAP_MEV_TAX_FACTOR, L2_SWAP_TAXED_GAS, L2FeeConfiguration
 };
 pub type PoolId = B256;
 
@@ -169,7 +168,9 @@ impl<T: V4Network> BaselinePoolState<T> {
         priority_fee_wei: Option<u128>
     ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
-        let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
+        let mev_tax_amount = priority_fee_wei
+            .map(|fee| self.fee_config.mev_tax(fee))
+            .filter(|&tax| tax > 0);
 
         PoolSwap {
             liquidity: liq,
@@ -216,7 +217,9 @@ impl<T: V4Network> BaselinePoolState<T> {
         priority_fee_wei: Option<u128>
     ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
-        let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
+        let mev_tax_amount = priority_fee_wei
+            .map(|fee| self.fee_config.mev_tax(fee))
+            .filter(|&tax| tax > 0);
 
         PoolSwap {
             liquidity: liq,
@@ -252,7 +255,9 @@ impl<T: V4Network> BaselinePoolState<T> {
     ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
         let direction = liq.current_sqrt_price >= price_limit;
-        let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
+        let mev_tax_amount = priority_fee_wei
+            .map(|fee| self.fee_config.mev_tax(fee))
+            .filter(|&tax| tax > 0);
 
         let price_swap: PoolSwapResult<'_, T> = PoolSwap {
             liquidity: liq,
@@ -315,7 +320,9 @@ impl<T: V4Network> BaselinePoolState<T> {
         priority_fee_wei: Option<u128>
     ) -> eyre::Result<PoolSwapResult<'_, T>> {
         let liq = self.liquidity.current();
-        let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
+        let mev_tax_amount = priority_fee_wei
+            .map(|fee| self.fee_config.mev_tax(fee))
+            .filter(|&tax| tax > 0);
 
         let direction = liq.current_sqrt_price >= price_limit;
 

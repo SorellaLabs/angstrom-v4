@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use alloy_primitives::{
     Address,
@@ -53,6 +53,13 @@ mod types {
 
             event ProtocolSwapFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);
             event ProtocolTaxFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);
+            event PriorityFeeTaxFloorUpdated(address indexed hook, uint256 newPriorityFeeTaxFloor);
+        }
+
+        #[derive(Debug)]
+        #[sol(rpc)]
+        contract AngstromL2Hook {
+            function priorityFeeTaxFloor() external view returns (uint256);
         }
     }
 
@@ -69,6 +76,25 @@ mod types {
     }
 }
 
+/// Batch-fetch `priorityFeeTaxFloor` for a set of hook addresses.
+async fn fetch_hook_floors<P: Provider<Optimism>>(
+    provider: &P,
+    hooks: HashSet<Address>
+) -> HashMap<Address, u128> {
+    let futures = hooks.into_iter().map(|hook_addr| async move {
+        let hook = AngstromL2Hook::new(hook_addr, provider);
+        let result = hook.priorityFeeTaxFloor().call().await.unwrap_or_else(|e| {
+            panic!("Failed to read priorityFeeTaxFloor from hook {hook_addr:?}: {e}")
+        });
+        (hook_addr, result.to())
+    });
+
+    futures::future::join_all(futures)
+        .await
+        .into_iter()
+        .collect()
+}
+
 impl<P> ProviderChainUpdate<Optimism> for PoolUpdateProvider<P, Optimism>
 where
     P: Provider<Optimism>
@@ -78,9 +104,21 @@ where
         from_block: u64,
         to_block: u64
     ) -> Result<Vec<PoolUpdate<Optimism>>, PoolUpdateError> {
-        let updates =
-            self.process_l2_factory_logs(self.fetch_l2_factory_logs(from_block, to_block).await?);
+        let logs = self.fetch_l2_factory_logs(from_block, to_block).await?;
 
+        // Pre-scan for unique hook addresses from PoolCreated events
+        let hook_addrs: HashSet<Address> = logs
+            .iter()
+            .filter_map(|log| {
+                AngstromL2Factory::PoolCreated::decode_log(&log.inner)
+                    .ok()
+                    .map(|e| e.hook)
+            })
+            .collect();
+
+        let hook_floors = fetch_hook_floors(self.provider(), hook_addrs).await;
+
+        let updates = self.process_l2_factory_logs(logs, &hook_floors);
         Ok(updates)
     }
 }
@@ -114,7 +152,8 @@ where
     /// Process L2 factory event logs
     fn process_l2_factory_logs(
         &mut self,
-        logs: Vec<alloy_rpc_types::Log>
+        logs: Vec<alloy_rpc_types::Log>,
+        hook_floors: &HashMap<Address, u128>
     ) -> Vec<PoolUpdate<Optimism>> {
         let mut updates = Vec::new();
 
@@ -129,6 +168,12 @@ where
                 registry.add_new_pool(pool_key);
 
                 let pool_id = PoolId::from(pool_key);
+                let floor = hook_floors.get(&event.hook).copied().unwrap_or_else(|| {
+                    panic!(
+                        "Missing priorityFeeTaxFloor for hook {:?} — should have been pre-fetched",
+                        event.hook
+                    )
+                });
 
                 updates.push(PoolUpdate::ChainSpecific {
                     pool_id,
@@ -143,7 +188,8 @@ where
                         creator_tax_fee_e6: event.creatorTaxFeeE6.to(),
                         protocol_tax_fee_e6: event.protocolTaxFeeE6.to(),
                         creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
-                        protocol_swap_fee_e6: event.protocolSwapFeeE6.to()
+                        protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
+                        priority_fee_tax_floor: floor
                     }
                 });
             } else if let Ok(event) =
@@ -155,8 +201,9 @@ where
                     pool_id,
                     block: block_number,
                     update: L2FeeUpdate {
-                        protocol_tax_fee_e6:  None,
-                        protocol_swap_fee_e6: Some(event.data.newFeeE6.to())
+                        protocol_tax_fee_e6:    None,
+                        protocol_swap_fee_e6:   Some(event.data.newFeeE6.to()),
+                        priority_fee_tax_floor: None
                     }
                 })
             } else if let Ok(event) =
@@ -168,10 +215,30 @@ where
                     pool_id,
                     block: block_number,
                     update: L2FeeUpdate {
-                        protocol_tax_fee_e6:  Some(event.data.newFeeE6.to()),
-                        protocol_swap_fee_e6: None
+                        protocol_tax_fee_e6:    Some(event.data.newFeeE6.to()),
+                        protocol_swap_fee_e6:   None,
+                        priority_fee_tax_floor: None
                     }
                 })
+            } else if let Ok(event) =
+                AngstromL2Factory::PriorityFeeTaxFloorUpdated::decode_log(&log.inner)
+            {
+                let hook_addr = event.hook;
+                let new_floor: u128 = event.newPriorityFeeTaxFloor.to();
+
+                // Update all pools belonging to this hook
+                let hook_pools = registry.pools(Some(hook_addr));
+                for (pool_id, _) in hook_pools {
+                    updates.push(PoolUpdate::FeeUpdate {
+                        pool_id,
+                        block: block_number,
+                        update: L2FeeUpdate {
+                            protocol_tax_fee_e6:    None,
+                            protocol_swap_fee_e6:   None,
+                            priority_fee_tax_floor: Some(new_floor)
+                        }
+                    });
+                }
             }
         }
 
@@ -223,6 +290,18 @@ where
         .flatten()
         .collect::<Vec<_>>();
 
+    // Pre-scan for unique hook addresses from PoolCreated events
+    let hook_addrs: HashSet<Address> = logs
+        .iter()
+        .filter_map(|log| {
+            AngstromL2Factory::PoolCreated::decode_log(&log.inner)
+                .ok()
+                .map(|e| e.hook)
+        })
+        .collect();
+
+    let hook_floors = fetch_hook_floors(db, hook_addrs).await;
+
     let all_updates = logs.into_iter().filter_map(|log| {
         let block_number = log.block_number.unwrap();
 
@@ -230,6 +309,12 @@ where
             let pool_key = event.key.clone();
 
             let pool_id = PoolId::from(PoolKey::from(pool_key.clone()));
+            let floor = hook_floors.get(&event.hook).copied().unwrap_or_else(|| {
+                panic!(
+                    "Missing priorityFeeTaxFloor for hook {:?} — should have been pre-fetched",
+                    event.hook
+                )
+            });
 
             Some(PoolUpdate::ChainSpecific {
                 pool_id,
@@ -244,7 +329,8 @@ where
                     creator_tax_fee_e6: event.creatorTaxFeeE6.to(),
                     protocol_tax_fee_e6: event.protocolTaxFeeE6.to(),
                     creator_swap_fee_e6: event.creatorSwapFeeE6.to(),
-                    protocol_swap_fee_e6: event.protocolSwapFeeE6.to()
+                    protocol_swap_fee_e6: event.protocolSwapFeeE6.to(),
+                    priority_fee_tax_floor: floor
                 }
             })
         } else if let Ok(event) = AngstromL2Factory::ProtocolSwapFeeUpdated::decode_log(&log.inner)
@@ -255,8 +341,9 @@ where
                 pool_id,
                 block: block_number,
                 update: L2FeeUpdate {
-                    protocol_tax_fee_e6:  None,
-                    protocol_swap_fee_e6: Some(event.data.newFeeE6.to())
+                    protocol_tax_fee_e6:    None,
+                    protocol_swap_fee_e6:   Some(event.data.newFeeE6.to()),
+                    priority_fee_tax_floor: None
                 }
             })
         } else if let Ok(event) = AngstromL2Factory::ProtocolTaxFeeUpdated::decode_log(&log.inner) {
@@ -266,11 +353,16 @@ where
                 pool_id,
                 block: block_number,
                 update: L2FeeUpdate {
-                    protocol_tax_fee_e6:  Some(event.data.newFeeE6.to()),
-                    protocol_swap_fee_e6: None
+                    protocol_tax_fee_e6:    Some(event.data.newFeeE6.to()),
+                    protocol_swap_fee_e6:   None,
+                    priority_fee_tax_floor: None
                 }
             })
         } else {
+            // PriorityFeeTaxFloorUpdated events are intentionally dropped during
+            // startup replay. The floor values are already fetched from the latest
+            // on-chain state via fetch_hook_floors() RPC calls above, so any
+            // intermediate floor-change events in the log history are stale.
             None
         }
     });
@@ -284,9 +376,9 @@ where
             _ => false
         })
         .sorted_by_key(|update| match update {
-            PoolUpdate::FeeUpdate { block, .. } => -(*block as i64),
+            PoolUpdate::FeeUpdate { block, .. } => *block as i64,
             PoolUpdate::ChainSpecific { update, .. } => match update {
-                L2PoolUpdate::NewPool { block, .. } => -(*block as i64)
+                L2PoolUpdate::NewPool { block, .. } => *block as i64
             },
             _ => unreachable!()
         });
@@ -303,6 +395,10 @@ where
                 if let Some(fee) = cfg_update.protocol_tax_fee_e6 {
                     pool.fee_cfg.protocol_tax_fee_e6 = fee;
                 }
+
+                if let Some(floor) = cfg_update.priority_fee_tax_floor {
+                    pool.fee_cfg.priority_fee_tax_floor = floor;
+                }
             }
         }
         PoolUpdate::ChainSpecific { update, .. } => match update {
@@ -317,6 +413,7 @@ where
                 tick_spacing,
                 hook_fee,
                 hook,
+                priority_fee_tax_floor,
                 ..
             } => {
                 let pool_key_with_fees = PoolKeyWithFees {
@@ -332,7 +429,8 @@ where
                         creator_tax_fee_e6,
                         protocol_tax_fee_e6,
                         creator_swap_fee_e6,
-                        protocol_swap_fee_e6
+                        protocol_swap_fee_e6,
+                        priority_fee_tax_floor
                     }
                 };
                 pool_keys.insert(pool_id, pool_key_with_fees);

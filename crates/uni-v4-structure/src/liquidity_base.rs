@@ -80,7 +80,7 @@ impl BaselineLiquidity {
                 self.start_liquidity += liquidity_delta as u128;
             }
 
-            return
+            return;
         }
 
         // Case were we are fully inside the range
@@ -117,7 +117,7 @@ impl BaselineLiquidity {
                 }
             }
 
-            return
+            return;
         }
 
         // lower tick is in range, upper out of range
@@ -154,7 +154,7 @@ impl BaselineLiquidity {
                     self.start_liquidity += liquidity_delta as u128;
                 }
             }
-            return
+            return;
         }
 
         // upper tick in range,

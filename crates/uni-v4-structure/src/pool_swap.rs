@@ -5,9 +5,7 @@ use alloy_primitives::{I256, U256};
 use uniswap_v3_math::tick_math::{MAX_SQRT_RATIO, MIN_SQRT_RATIO};
 
 use super::liquidity_base::LiquidityAtPoint;
-use crate::{
-    V4Network, calculate_l2_mev_tax, fee_config::FeeConfig, ray::Ray, sqrt_pricex96::SqrtPriceX96
-};
+use crate::{V4Network, fee_config::FeeConfig, ray::Ray, sqrt_pricex96::SqrtPriceX96};
 
 const U256_1: U256 = U256::from_limbs([1, 0, 0, 0]);
 
@@ -24,9 +22,8 @@ pub struct PoolSwap<'a, T: V4Network> {
     pub(super) fee_config:     T::FeeConfig,
     pub(super) is_bundle:      bool,
     /// L2 MEV tax amount in wei (only applicable for L2 pools).
-    /// This is calculated as: SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS *
-    /// priority_fee Use `calculate_l2_mev_tax(priority_fee)` to compute
-    /// this value.
+    /// Calculated via `fee_config.mev_tax(priority_fee)` which accounts for
+    /// the priority fee tax floor.
     pub(super) mev_tax_amount: Option<u128>
 }
 
@@ -244,7 +241,9 @@ impl<'a, T: V4Network> PoolSwapResult<'a, T> {
         direction: bool,
         priority_fee_wei: Option<u128>
     ) -> eyre::Result<PoolSwapResult<'a, T>> {
-        let mev_tax_amount = priority_fee_wei.map(calculate_l2_mev_tax);
+        let mev_tax_amount = priority_fee_wei
+            .map(|fee| self.fee_config.mev_tax(fee))
+            .filter(|&tax| tax > 0);
         PoolSwap {
             liquidity: self.end_liquidity.clone(),
             target_price: None,

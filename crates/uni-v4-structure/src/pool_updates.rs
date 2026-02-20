@@ -186,30 +186,6 @@ pub enum L1PoolUpdate {
     PoolRemoved { pool_id: B256, block: u64 }
 }
 
-impl L1PoolUpdate {
-    pub fn from_new_pool(
-        pool_id: B256,
-        token0: Address,
-        token1: Address,
-        bundle_fee: u32,
-        swap_fee: u32,
-        protocol_fee: u32,
-        tick_spacing: i32,
-        block: u64
-    ) -> Self {
-        L1PoolUpdate::NewPool {
-            pool_id,
-            token0,
-            token1,
-            bundle_fee,
-            swap_fee,
-            protocol_fee,
-            tick_spacing,
-            block
-        }
-    }
-}
-
 /// Slot0 update from real-time feed
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Slot0Update {

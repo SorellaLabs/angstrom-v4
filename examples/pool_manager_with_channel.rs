@@ -1,14 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
+use alloy_network::Ethereum;
 use alloy_primitives::address;
 use alloy_provider::{ProviderBuilder, WsConnect};
 use eyre::Result;
 use tokio::sync::mpsc;
-use alloy_network::Ethereum;
 use uni_v4_common::PoolUpdate;
 use uni_v4_structure::{L1AddressBook, pool_registry::L1PoolRegistry};
-use uni_v4_upkeeper::{
-    pool_manager_service_builder::{NoOpSlot0Stream, PoolManagerServiceBuilder, NoOpEventStream}
+use uni_v4_upkeeper::pool_manager_service_builder::{
+    NoOpEventStream, NoOpSlot0Stream, PoolManagerServiceBuilder
 };
 
 #[tokio::main]
@@ -96,8 +96,11 @@ async fn main() -> Result<()> {
                     println!("🆕 Received NewPoolState with state for pool {pool_id:?}");
                 }
                 PoolUpdate::UpdatedSlot0 { pool_id, data } => {
-                    println!("🔄 Received UpdatedSlot0 for pool {:?} - tick: {}, sqrt_price: {}, liquidity: {}",
-                        pool_id, data.tick, data.sqrt_price_x96, data.liquidity);
+                    println!(
+                        "🔄 Received UpdatedSlot0 for pool {:?} - tick: {}, sqrt_price: {}, \
+                         liquidity: {}",
+                        pool_id, data.tick, data.sqrt_price_x96, data.liquidity
+                    );
                 }
                 _ => {
                     println!("📬 Received other message type");
