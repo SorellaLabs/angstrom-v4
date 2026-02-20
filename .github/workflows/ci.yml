@@ -134,6 +134,6 @@ jobs:
           ${{ runner.os }}-cargo-
 
     - name: Run integration tests
-      run: cargo test --features integration
+      run: cargo test -p uni-v4
       env:
         SKIP_INTEGRATION_TESTS: false
