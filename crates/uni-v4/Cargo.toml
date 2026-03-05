@@ -12,7 +12,7 @@ uni-v4-upkeeper.workspace = true
 
 
 [dev-dependencies]
-alloy = { version = "1.0.41", features = ["full"] }
+alloy = { version = "1.0.41", features = ["full", "node-bindings"] }
 futures.workspace = true
 tokio.workspace = true
 dotenv = "0"

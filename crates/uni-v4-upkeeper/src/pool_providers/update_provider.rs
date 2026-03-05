@@ -1027,7 +1027,7 @@ where
     let mut filters = vec![];
 
     loop {
-        let this_end_block = std::cmp::min(deploy_block + 99_999, end_block);
+        let this_end_block = std::cmp::min(deploy_block + 5_000, end_block);
 
         if this_end_block == deploy_block {
             break;

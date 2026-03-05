@@ -308,7 +308,7 @@ where
     let mut filters = vec![];
 
     loop {
-        let this_end_block = std::cmp::min(deploy_block + 99_999, end_block);
+        let this_end_block = std::cmp::min(deploy_block + 2_000, end_block);
 
         if this_end_block == deploy_block {
             break;
@@ -333,7 +333,7 @@ where
                 .into_iter()
                 .collect::<Vec<_>>()
         })
-        .buffered(10)
+        .buffered(2)
         .collect::<Vec<_>>()
         .await
         .into_iter()
