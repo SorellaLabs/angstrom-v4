@@ -146,6 +146,12 @@ async fn test_l2_swap_matches_onchain() {
     let registry = service.get_registry();
     let pool_key = make_pool_key(&registry, &pool_id);
 
+    println!(
+        "PoolKey: currency0={:?} currency1={:?} fee={} tickSpacing={} hooks={:?}",
+        pool_key.currency0, pool_key.currency1, pool_key.fee, pool_key.tickSpacing, pool_key.hooks
+    );
+    println!("PoolId from registry: {pool_id:?}");
+
     // Anvil fork + deploy quoter
     let anvil = Anvil::new()
         .fork(&base_url)
@@ -173,7 +179,7 @@ async fn test_l2_swap_matches_onchain() {
             let sqrt_price_limit =
                 if zero_for_one { MIN_SQRT_PRICE_LIMIT } else { MAX_SQRT_PRICE_LIMIT };
 
-            let result = quoter
+            let quote_result = quoter
                 .quote(
                     pool_key.clone(),
                     SwapParams {
@@ -184,13 +190,18 @@ async fn test_l2_swap_matches_onchain() {
                     vec![].into()
                 )
                 .call()
-                .await
-                .unwrap_or_else(|e| panic!("On-chain quote failed ({label}): {e}"));
+                .await;
 
-            println!(
-                "{label}: local t0={} t1={} | onchain a0={} a1={}",
-                local_result.total_d_t0, local_result.total_d_t1, result.amount0, result.amount1
-            );
+            match &quote_result {
+                Ok(r) => println!(
+                    "{label}: local t0={} t1={} | onchain a0={} a1={}",
+                    local_result.total_d_t0, local_result.total_d_t1, r.amount0, r.amount1
+                ),
+                Err(e) => println!("{label}: quoter error: {e:?}")
+            }
+
+            let result =
+                quote_result.unwrap_or_else(|e| panic!("On-chain quote failed ({label}): {e}"));
 
             assert_deltas_match(
                 local_result.total_d_t0,
