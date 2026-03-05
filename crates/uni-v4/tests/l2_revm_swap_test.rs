@@ -24,10 +24,16 @@ const TARGET_BLOCK: u64 = 42977290;
 
 const CBBTC: Address = address!("0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf");
 
-// Small amount that stays within a single tick (~0.001 cbBTC, 8 decimals)
-const SMALL_AMOUNT: i64 = 100_000;
-// Larger amount designed to cross tick boundaries (~0.1 cbBTC)
-const LARGE_AMOUNT: i64 = 10_000_000;
+// Swap amounts in ascending order (cbBTC has 8 decimals)
+const SWAP_AMOUNTS: &[(i64, &str)] = &[
+    (10_000, "0.0001 cbBTC"),
+    (100_000, "0.001 cbBTC"),
+    (1_000_000, "0.01 cbBTC"),
+    (5_000_000, "0.05 cbBTC"),
+    (10_000_000, "0.1 cbBTC"),
+    (50_000_000, "0.5 cbBTC"),
+    (100_000_000, "1 cbBTC"),
+];
 
 type U160 = Uint<160, 3>;
 
@@ -170,13 +176,22 @@ async fn test_l2_swap_matches_onchain() {
     let basefee = block.header.base_fee_per_gas.expect("no basefee") as u128;
 
     for (zero_for_one, dir_label) in [(false, "CBBTC->ETH"), (true, "ETH->CBBTC")] {
-        for (amount_raw, size_label) in [(SMALL_AMOUNT, "small"), (LARGE_AMOUNT, "large")] {
+        for &(amount_raw, size_label) in SWAP_AMOUNTS {
             let label = format!("{dir_label} {size_label}");
 
             // Local: positive I256 = exact input
             let local_result = pool_state
-                .swap_current_with_amount(I256::try_from(amount_raw).unwrap(), zero_for_one, false)
-                .unwrap_or_else(|e| panic!("Local swap failed ({label}): {e}"));
+                .swap_current_with_amount(I256::try_from(amount_raw).unwrap(), zero_for_one, false);
+
+            // Out-of-range is acceptable — the loaded tick window is finite
+            let local_result = match local_result {
+                Err(e) if e.to_string().contains("out of initialized tick ranges") => {
+                    println!("{label}: out of loaded tick range (acceptable)");
+                    continue;
+                }
+                Err(e) => panic!("Local swap failed with unexpected error ({label}): {e}"),
+                Ok(r) => r
+            };
 
             // On-chain: negative amountSpecified = exact input
             let sqrt_price_limit =
@@ -287,7 +302,7 @@ async fn test_l2_swap_with_mev_tax_matches_onchain() {
     println!("basefee={basefee}, priority_fee={priority_fee}, gas_price={gas_price}");
 
     for (zero_for_one, dir_label) in [(false, "CBBTC->ETH"), (true, "ETH->CBBTC")] {
-        for (amount_raw, size_label) in [(SMALL_AMOUNT, "small"), (LARGE_AMOUNT, "large")] {
+        for &(amount_raw, size_label) in SWAP_AMOUNTS {
             let label = format!("{dir_label} {size_label} mev_tax");
 
             // Local swap with MEV tax
@@ -297,8 +312,17 @@ async fn test_l2_swap_with_mev_tax_matches_onchain() {
                     zero_for_one,
                     false,
                     Some(priority_fee)
-                )
-                .unwrap_or_else(|e| panic!("Local swap failed ({label}): {e}"));
+                );
+
+            // Out-of-range is acceptable — the loaded tick window is finite
+            let local_result = match local_result {
+                Err(e) if e.to_string().contains("out of initialized tick ranges") => {
+                    println!("{label}: out of loaded tick range (acceptable)");
+                    continue;
+                }
+                Err(e) => panic!("Local swap failed with unexpected error ({label}): {e}"),
+                Ok(r) => r
+            };
 
             // On-chain quote with elevated gas price
             let sqrt_price_limit =
