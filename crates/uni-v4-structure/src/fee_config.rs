@@ -58,10 +58,12 @@ pub trait FeeConfig:
 
     fn update_fees(&mut self, update: Self::Update);
 
+    /// Whether this fee config uses L2-style fees (BeforeSwapDelta + MEV tax).
+    fn l2_fees(&self) -> bool;
+
     /// Calculate MEV tax given a priority fee in wei.
-    /// Default returns 0 (no MEV tax, used by L1).
-    /// L2 implements: SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * (priority_fee -
-    /// floor)
+    /// L1 returns 0. L2 implements: SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS *
+    /// (priority_fee - floor)
     fn mev_tax(&self, _priority_fee_wei: u128) -> u128 {
         0
     }
@@ -69,6 +71,10 @@ pub trait FeeConfig:
 
 impl FeeConfig for L1FeeConfiguration {
     type Update = L1FeeUpdate;
+
+    fn l2_fees(&self) -> bool {
+        false
+    }
 
     fn protocol_fee(&self) -> u32 {
         self.protocol_fee
@@ -115,6 +121,10 @@ impl FeeConfig for L2FeeConfiguration {
 
     fn fee(&self, _: bool) -> u32 {
         self.swap_fee() + self.protocol_fee()
+    }
+
+    fn l2_fees(&self) -> bool {
+        true
     }
 
     fn priority_fee_tax_floor(&self) -> u128 {
