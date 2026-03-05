@@ -146,12 +146,6 @@ async fn test_l2_swap_matches_onchain() {
     let registry = service.get_registry();
     let pool_key = make_pool_key(&registry, &pool_id);
 
-    println!(
-        "PoolKey: currency0={:?} currency1={:?} fee={} tickSpacing={} hooks={:?}",
-        pool_key.currency0, pool_key.currency1, pool_key.fee, pool_key.tickSpacing, pool_key.hooks
-    );
-    println!("PoolId from registry: {pool_id:?}");
-
     // Anvil fork + deploy quoter
     let anvil = Anvil::new()
         .fork(&base_url)
@@ -166,6 +160,15 @@ async fn test_l2_swap_matches_onchain() {
 
     println!("SwapQuoter deployed at {:?}", quoter.address());
 
+    // Must set gas_price >= basefee for the quoter call, otherwise the L2 hook's
+    // `tx.gasprice - block.basefee` underflows in uint256 and reverts.
+    let block = anvil_provider
+        .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
+        .await
+        .expect("failed to get block")
+        .expect("block not found");
+    let basefee = block.header.base_fee_per_gas.expect("no basefee") as u128;
+
     for (zero_for_one, dir_label) in [(false, "CBBTC->ETH"), (true, "ETH->CBBTC")] {
         for (amount_raw, size_label) in [(SMALL_AMOUNT, "small"), (LARGE_AMOUNT, "large")] {
             let label = format!("{dir_label} {size_label}");
@@ -179,7 +182,7 @@ async fn test_l2_swap_matches_onchain() {
             let sqrt_price_limit =
                 if zero_for_one { MIN_SQRT_PRICE_LIMIT } else { MAX_SQRT_PRICE_LIMIT };
 
-            let quote_result = quoter
+            let result = quoter
                 .quote(
                     pool_key.clone(),
                     SwapParams {
@@ -189,19 +192,15 @@ async fn test_l2_swap_matches_onchain() {
                     },
                     vec![].into()
                 )
+                .gas_price(basefee)
                 .call()
-                .await;
+                .await
+                .unwrap_or_else(|e| panic!("On-chain quote failed ({label}): {e}"));
 
-            match &quote_result {
-                Ok(r) => println!(
-                    "{label}: local t0={} t1={} | onchain a0={} a1={}",
-                    local_result.total_d_t0, local_result.total_d_t1, r.amount0, r.amount1
-                ),
-                Err(e) => println!("{label}: quoter error: {e:?}")
-            }
-
-            let result =
-                quote_result.unwrap_or_else(|e| panic!("On-chain quote failed ({label}): {e}"));
+            println!(
+                "{label}: local t0={} t1={} | onchain a0={} a1={}",
+                local_result.total_d_t0, local_result.total_d_t1, result.amount0, result.amount1
+            );
 
             assert_deltas_match(
                 local_result.total_d_t0,
