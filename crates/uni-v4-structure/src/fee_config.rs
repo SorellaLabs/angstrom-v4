@@ -20,6 +20,7 @@ pub struct L1FeeConfiguration {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct L2FeeConfiguration {
     pub is_initialized:         bool,
+    pub lp_fee:                 u32,
     pub creator_tax_fee_e6:     u32,
     pub protocol_tax_fee_e6:    u32,
     pub creator_swap_fee_e6:    u32,
@@ -36,7 +37,7 @@ pub trait FeeConfig:
 
     /// Returns the swap fee applied during the swap (in compute_swap_step).
     /// - L1: LP fee charged during swap
-    /// - L2: 0 (no LP fee during swap, all fees applied after)
+    /// - L2: Pool's static LP fee from PoolKey.fee (charged by V4 AMM)
     fn swap_fee(&self) -> u32;
     /// Returns the protocol fee applied after the swap on the output token.
     /// - L1: protocol_fee applied after swap
@@ -48,7 +49,7 @@ pub trait FeeConfig:
     /// Returns the total fee for a swap.
     /// - L1 bundle mode: uses bundle_fee
     /// - L1 unlocked mode: swap_fee + protocol_fee
-    /// - L2: swap_fee (0) + protocol_fee (creator + protocol swap fees)
+    /// - L2: lp_fee + protocol_fee (creator + protocol swap fees)
     fn fee(&self, bundle: bool) -> u32;
 
     fn priority_fee_tax_floor(&self) -> u128 {
@@ -105,7 +106,7 @@ impl FeeConfig for L2FeeConfiguration {
     }
 
     fn swap_fee(&self) -> u32 {
-        0
+        self.lp_fee
     }
 
     fn bundle_fee(&self) -> Option<u32> {
@@ -171,6 +172,7 @@ mod tests {
     fn l2_fee_config(floor: u128) -> L2FeeConfiguration {
         L2FeeConfiguration {
             is_initialized:         true,
+            lp_fee:                 0,
             creator_tax_fee_e6:     1000,
             protocol_tax_fee_e6:    2000,
             creator_swap_fee_e6:    3000,

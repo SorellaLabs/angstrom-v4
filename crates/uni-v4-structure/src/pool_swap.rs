@@ -58,7 +58,7 @@ impl<'a, T: V4Network> PoolSwap<'a, T> {
         //   - swap fee (protocol_fee) is taken from the input token amount
         //   - MEV tax is taken from ETH (token0): from input if ETH is input, from
         //     output if ETH is output
-        //   - AMM runs with reduced input and LP fee = 0
+        //   - AMM runs with reduced input and pool's LP fee
         let protocol_fee_rate = self.fee_config.protocol_fee();
         let mev_tax = self.mev_tax_amount.unwrap_or(0);
         let ether_is_input = self.direction; // zeroForOne = selling ETH

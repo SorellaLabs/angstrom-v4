@@ -497,6 +497,7 @@ where
                     },
                     fee_cfg:  L2FeeConfiguration {
                         is_initialized: true,
+                        lp_fee: hook_fee,
                         creator_tax_fee_e6,
                         protocol_tax_fee_e6,
                         creator_swap_fee_e6,
