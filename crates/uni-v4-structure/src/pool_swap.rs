@@ -50,7 +50,56 @@ impl<'a, T: V4Network> PoolSwap<'a, T> {
             if self.direction { MIN_SQRT_RATIO + U256_1 } else { MAX_SQRT_RATIO - U256_1 }
         });
 
-        let mut amount_remaining = self.target_amount;
+        // L2 BeforeSwapDelta: deduct protocol fee + MEV tax from input BEFORE AMM.
+        // This mirrors AngstromL2.sol's beforeSwap which returns a BeforeSwapDelta
+        // that reduces amountSpecified before the pool swap runs.
+        //
+        // For exact input:
+        //   - swap fee (protocol_fee) is taken from the input token amount
+        //   - MEV tax is taken from ETH (token0): from input if ETH is input, from
+        //     output if ETH is output
+        //   - AMM runs with reduced input and LP fee = 0
+        let protocol_fee_rate = self.fee_config.protocol_fee();
+        let mev_tax = self.mev_tax_amount.unwrap_or(0);
+        let ether_is_input = self.direction; // zeroForOne = selling ETH
+
+        // Calculate how much of the input to deduct before AMM
+        let (before_swap_input_deduction, before_swap_output_deduction) =
+            if !self.is_bundle && exact_input && protocol_fee_rate > 0 {
+                let input_amount = self.target_amount.unsigned_abs();
+
+                // MEV tax is on ETH. If ETH is the input token, subtract it first
+                // (matches Solidity: `if (etherIsInput) inputAmount -= swapTax`)
+                let taxable_input = if ether_is_input {
+                    input_amount.saturating_sub(U256::from(mev_tax))
+                } else {
+                    input_amount
+                };
+
+                let fee_amount =
+                    taxable_input * U256::from(protocol_fee_rate) / U256::from(1_000_000u32);
+
+                if ether_is_input {
+                    // ETH→CBBTC: both mev_tax and fee deducted from input (specified)
+                    (mev_tax + fee_amount.saturating_to::<u128>(), 0u128)
+                } else {
+                    // CBBTC→ETH: fee from input (specified), mev_tax from output (unspecified/ETH)
+                    (fee_amount.saturating_to::<u128>(), mev_tax)
+                }
+            } else if !self.is_bundle && exact_input && mev_tax > 0 {
+                // No protocol fee but MEV tax applies
+                if ether_is_input { (mev_tax, 0u128) } else { (0u128, mev_tax) }
+            } else {
+                (0u128, 0u128)
+            };
+
+        // Reduce input amount by beforeSwap deduction (fees taken before AMM)
+        let mut amount_remaining = if before_swap_input_deduction > 0 && exact_input {
+            self.target_amount
+                .saturating_sub(I256::from_raw(U256::from(before_swap_input_deduction)))
+        } else {
+            self.target_amount
+        };
         let mut sqrt_price_x96: U256 = self.liquidity.current_sqrt_price.into();
 
         let mut steps = Vec::new();
@@ -125,73 +174,28 @@ impl<'a, T: V4Network> PoolSwap<'a, T> {
             (t0, t1)
         });
 
-        // Calculate and apply protocol fee directly to deltas for unlocked mode
-        let (final_d_t0, final_d_t1) = if !self.is_bundle {
-            let fee_rate_e6 = U256::from(self.fee_config.protocol_fee());
-            let one_e6 = U256::from(1_000_000);
-
-            // Determine which token gets the protocol fee based on swap direction
-            // exact_input != self.direction determines the target token
-            let target_is_token0 = exact_input != self.direction;
-
-            if target_is_token0 {
-                // Protocol fee applies to token0
-                let p_target_amount_u256 = U256::from(total_d_t0);
-
-                let fee = if exact_input {
-                    p_target_amount_u256 * fee_rate_e6 / one_e6
-                } else {
-                    p_target_amount_u256 * one_e6 / (one_e6 - fee_rate_e6) - p_target_amount_u256
-                };
-
-                // based on direction here, if this is the input token, we add,
-                // if output, we subtract.
+        // Apply beforeSwap deductions to the final deltas.
+        // The AMM ran on a reduced input, so AMM deltas reflect the post-fee amounts.
+        // We need to add back the fees to the input side (caller pays full amount)
+        // and subtract MEV tax from output if applicable.
+        let (final_d_t0, final_d_t1) =
+            if before_swap_input_deduction > 0 || before_swap_output_deduction > 0 {
                 if self.direction {
-                    let adjusted_d_t0 = total_d_t0.saturating_add(fee.saturating_to::<u128>());
-                    (adjusted_d_t0, total_d_t1)
+                    // zeroForOne: token0 is input, token1 is output
+                    // Add input deductions (mev_tax + fee) back to token0 input
+                    let adj_t0 = total_d_t0.saturating_add(before_swap_input_deduction);
+                    (adj_t0, total_d_t1)
                 } else {
-                    let adjusted_d_t0 = total_d_t0.saturating_sub(fee.saturating_to::<u128>());
-                    (adjusted_d_t0, total_d_t1)
+                    // oneForZero: token1 is input, token0 is output
+                    // Add input deductions (fee) back to token1 input
+                    let adj_t1 = total_d_t1.saturating_add(before_swap_input_deduction);
+                    // Subtract output deductions (mev_tax) from token0 output
+                    let adj_t0 = total_d_t0.saturating_sub(before_swap_output_deduction);
+                    (adj_t0, adj_t1)
                 }
             } else {
-                // Protocol fee applies to token1
-                let p_target_amount_u256 = U256::from(total_d_t1);
-
-                let fee = if exact_input {
-                    p_target_amount_u256 * fee_rate_e6 / one_e6
-                } else {
-                    p_target_amount_u256 * one_e6 / (one_e6 - fee_rate_e6) - p_target_amount_u256
-                };
-
-                if self.direction {
-                    let adjusted_d_t1 = total_d_t1.saturating_sub(fee.saturating_to::<u128>());
-                    (total_d_t0, adjusted_d_t1)
-                } else {
-                    let adjusted_d_t1 = total_d_t1.saturating_add(fee.saturating_to::<u128>());
-                    (total_d_t0, adjusted_d_t1)
-                }
-            }
-        } else {
-            // In bundle mode, no protocol fee is applied during swap
-            (total_d_t0, total_d_t1)
-        };
-
-        // Apply L2 MEV tax to token0 (ETH) delta if applicable.
-        // In L2 pools, token0 is always native ETH.
-        // - zeroForOne=true (selling ETH): user pays more ETH (add tax to input)
-        // - zeroForOne=false (buying ETH): user receives less ETH (subtract tax from
-        //   output)
-        let (final_d_t0, final_d_t1) = if let Some(mev_tax) = self.mev_tax_amount {
-            if self.direction {
-                // Selling ETH: add MEV tax to token0 input
-                (final_d_t0.saturating_add(mev_tax), final_d_t1)
-            } else {
-                // Buying ETH: subtract MEV tax from token0 output
-                (final_d_t0.saturating_sub(mev_tax), final_d_t1)
-            }
-        } else {
-            (final_d_t0, final_d_t1)
-        };
+                (total_d_t0, total_d_t1)
+            };
 
         Ok(PoolSwapResult {
             fee_config: self.fee_config,

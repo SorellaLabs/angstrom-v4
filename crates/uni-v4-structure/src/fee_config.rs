@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// L2 MEV tax constants from AngstromL2.sol
 /// The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap.
-pub const L2_SWAP_TAXED_GAS: u128 = 100_000;
+pub const L2_SWAP_TAXED_GAS: u128 = 120_000;
 /// MEV tax charged is `priority_fee * SWAP_MEV_TAX_FACTOR` meaning the tax rate
 /// is `SWAP_MEV_TAX_FACTOR / (SWAP_MEV_TAX_FACTOR + 1)`
 pub const L2_SWAP_MEV_TAX_FACTOR: u128 = 99;
@@ -192,10 +192,10 @@ mod tests {
     #[test]
     fn l2_mev_tax_zero_floor() {
         let cfg = l2_fee_config(0);
-        // 99 * 100_000 * 1 = 9_900_000
-        assert_eq!(cfg.mev_tax(1), 9_900_000);
-        // 99 * 100_000 * 1_000_000_000 (1 gwei) = 9_900_000_000_000_000
-        assert_eq!(cfg.mev_tax(1_000_000_000), 9_900_000_000_000_000);
+        // 99 * 120_000 * 1 = 11_880_000
+        assert_eq!(cfg.mev_tax(1), 11_880_000);
+        // 99 * 120_000 * 1_000_000_000 (1 gwei) = 11_880_000_000_000_000
+        assert_eq!(cfg.mev_tax(1_000_000_000), 11_880_000_000_000_000);
     }
 
     #[test]
@@ -215,8 +215,8 @@ mod tests {
     fn l2_mev_tax_subtracts_floor() {
         let cfg = l2_fee_config(100);
         // priority_fee=150, effective=50
-        // 99 * 100_000 * 50 = 495_000_000
-        assert_eq!(cfg.mev_tax(150), 99 * 100_000 * 50);
+        // 99 * 120_000 * 50 = 594_000_000
+        assert_eq!(cfg.mev_tax(150), 99 * 120_000 * 50);
     }
 
     #[test]

@@ -9,6 +9,7 @@ use alloy::{
 };
 use op_alloy_network::Optimism;
 use uni_v4::l2_structure::{L2AddressBook, pool_registry::L2PoolRegistry};
+use uni_v4_structure::pool_registry::PoolRegistry;
 use uni_v4_upkeeper::pool_manager_service_builder::PoolManagerServiceBuilder;
 
 fn get_base_url() -> Option<String> {
@@ -18,7 +19,6 @@ fn get_base_url() -> Option<String> {
 
 const POOL_MANAGER: Address = address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
 const ANGSTROM_L2_FACTORY: Address = address!("0x0000000000a5f21b113a18dd18f6fbeebd01201b");
-const HOOK_ADDRESS: Address = address!("0xf96510247aba6a6b997b60ac4d98bb51aff265cf");
 const DEPLOY_BLOCK: u64 = 42966000;
 const TARGET_BLOCK: u64 = 42977290;
 
@@ -84,13 +84,14 @@ fn assert_deltas_match(
     assert_eq!(local_d_t1, onchain_amount1.unsigned_abs(), "{label}: token1 delta mismatch");
 }
 
-fn make_pool_key(tick_spacing: i32) -> PoolKey {
+fn make_pool_key(registry: &L2PoolRegistry, pool_id: &alloy::primitives::B256) -> PoolKey {
+    let k = registry.get(pool_id).expect("pool not found in registry");
     PoolKey {
-        currency0:   Address::ZERO,
-        currency1:   CBBTC,
-        fee:         0x800000u32.try_into().unwrap(),
-        tickSpacing: tick_spacing.try_into().unwrap(),
-        hooks:       HOOK_ADDRESS
+        currency0:   k.currency0,
+        currency1:   k.currency1,
+        fee:         k.fee.to::<u32>().try_into().unwrap(),
+        tickSpacing: (k.tickSpacing.as_i32()).try_into().unwrap(),
+        hooks:       k.hooks
     }
 }
 
@@ -134,13 +135,16 @@ async fn test_l2_swap_matches_onchain() {
 
     let pool_state = pools.get_pools().get(&pool_id).expect("pool disappeared");
     assert!(pool_state.current_liquidity() > 0, "Pool has no liquidity");
-    let tick_spacing = pool_state.tick_spacing();
 
     println!(
-        "Pool: tick={}, liquidity={}, tick_spacing={tick_spacing}",
+        "Pool: tick={}, liquidity={}, tick_spacing={}",
         pool_state.current_tick(),
-        pool_state.current_liquidity()
+        pool_state.current_liquidity(),
+        pool_state.tick_spacing()
     );
+
+    let registry = service.get_registry();
+    let pool_key = make_pool_key(&registry, &pool_id);
 
     // Anvil fork + deploy quoter
     let anvil = Anvil::new()
@@ -155,8 +159,6 @@ async fn test_l2_swap_matches_onchain() {
         .expect("Failed to deploy SwapQuoter");
 
     println!("SwapQuoter deployed at {:?}", quoter.address());
-
-    let pool_key = make_pool_key(tick_spacing);
 
     for (zero_for_one, dir_label) in [(false, "CBBTC->ETH"), (true, "ETH->CBBTC")] {
         for (amount_raw, size_label) in [(SMALL_AMOUNT, "small"), (LARGE_AMOUNT, "large")] {
@@ -245,7 +247,9 @@ async fn test_l2_swap_with_mev_tax_matches_onchain() {
 
     let pool_state = pools.get_pools().get(&pool_id).expect("pool disappeared");
     assert!(pool_state.current_liquidity() > 0, "Pool has no liquidity");
-    let tick_spacing = pool_state.tick_spacing();
+
+    let registry = service.get_registry();
+    let pool_key = make_pool_key(&registry, &pool_id);
 
     // Anvil fork + deploy quoter
     let anvil = Anvil::new()
@@ -271,8 +275,6 @@ async fn test_l2_swap_with_mev_tax_matches_onchain() {
     let gas_price = basefee as u128 + priority_fee;
 
     println!("basefee={basefee}, priority_fee={priority_fee}, gas_price={gas_price}");
-
-    let pool_key = make_pool_key(tick_spacing);
 
     for (zero_for_one, dir_label) in [(false, "CBBTC->ETH"), (true, "ETH->CBBTC")] {
         for (amount_raw, size_label) in [(SMALL_AMOUNT, "small"), (LARGE_AMOUNT, "large")] {
