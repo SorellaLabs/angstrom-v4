@@ -11,6 +11,7 @@ contract SwapQuoter is IUnlockCallback {
     IPoolManager public immutable manager;
 
     error QuoteResult(int128 amount0, int128 amount1);
+    error UnexpectedRevert(bytes reason);
 
     constructor(IPoolManager _manager) {
         manager = _manager;
@@ -24,7 +25,14 @@ contract SwapQuoter is IUnlockCallback {
         try manager.unlock(abi.encode(key, params, hookData)) {
             revert("Expected revert");
         } catch (bytes memory reason) {
-            // Skip 4-byte selector of QuoteResult error
+            // Verify the revert is our QuoteResult error before decoding
+            bytes4 selector;
+            assembly {
+                selector := mload(add(reason, 32))
+            }
+            if (selector != QuoteResult.selector || reason.length < 68) {
+                revert UnexpectedRevert(reason);
+            }
             assembly {
                 amount0 := mload(add(reason, 36))
                 amount1 := mload(add(reason, 68))
