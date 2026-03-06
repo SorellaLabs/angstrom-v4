@@ -41,8 +41,8 @@ contract GetUniswapV4PoolData {
             slot0.tick()
         );
 
-        poolData.token0Decimals = IERC20(asset0).decimals();
-        poolData.token1Decimals = IERC20(asset1).decimals();
+        poolData.token0Decimals = asset0 == address(0) ? 18 : IERC20(asset0).decimals();
+        poolData.token1Decimals = asset1 == address(0) ? 18 : IERC20(asset1).decimals();
 
         poolData.liquidity = liquidity;
         poolData.sqrtPrice = slot0.sqrtPriceX96();

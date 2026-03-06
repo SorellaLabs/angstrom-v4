@@ -308,7 +308,7 @@ where
     let mut filters = vec![];
 
     loop {
-        let this_end_block = std::cmp::min(deploy_block + 99_999, end_block);
+        let this_end_block = std::cmp::min(deploy_block + 9_999, end_block);
 
         if this_end_block == deploy_block {
             break;
@@ -333,7 +333,7 @@ where
                 .into_iter()
                 .collect::<Vec<_>>()
         })
-        .buffered(10)
+        .buffered(2)
         .collect::<Vec<_>>()
         .await
         .into_iter()
@@ -497,6 +497,7 @@ where
                     },
                     fee_cfg:  L2FeeConfiguration {
                         is_initialized: true,
+                        lp_fee: hook_fee,
                         creator_tax_fee_e6,
                         protocol_tax_fee_e6,
                         creator_swap_fee_e6,

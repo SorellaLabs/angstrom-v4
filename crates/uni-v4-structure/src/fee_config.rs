@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// L2 MEV tax constants from AngstromL2.sol
 /// The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap.
-pub const L2_SWAP_TAXED_GAS: u128 = 100_000;
+pub const L2_SWAP_TAXED_GAS: u128 = 120_000;
 /// MEV tax charged is `priority_fee * SWAP_MEV_TAX_FACTOR` meaning the tax rate
 /// is `SWAP_MEV_TAX_FACTOR / (SWAP_MEV_TAX_FACTOR + 1)`
 pub const L2_SWAP_MEV_TAX_FACTOR: u128 = 99;
@@ -20,6 +20,7 @@ pub struct L1FeeConfiguration {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct L2FeeConfiguration {
     pub is_initialized:         bool,
+    pub lp_fee:                 u32,
     pub creator_tax_fee_e6:     u32,
     pub protocol_tax_fee_e6:    u32,
     pub creator_swap_fee_e6:    u32,
@@ -36,7 +37,7 @@ pub trait FeeConfig:
 
     /// Returns the swap fee applied during the swap (in compute_swap_step).
     /// - L1: LP fee charged during swap
-    /// - L2: 0 (no LP fee during swap, all fees applied after)
+    /// - L2: Pool's static LP fee from PoolKey.fee (charged by V4 AMM)
     fn swap_fee(&self) -> u32;
     /// Returns the protocol fee applied after the swap on the output token.
     /// - L1: protocol_fee applied after swap
@@ -48,7 +49,7 @@ pub trait FeeConfig:
     /// Returns the total fee for a swap.
     /// - L1 bundle mode: uses bundle_fee
     /// - L1 unlocked mode: swap_fee + protocol_fee
-    /// - L2: swap_fee (0) + protocol_fee (creator + protocol swap fees)
+    /// - L2: lp_fee + protocol_fee (creator + protocol swap fees)
     fn fee(&self, bundle: bool) -> u32;
 
     fn priority_fee_tax_floor(&self) -> u128 {
@@ -57,10 +58,12 @@ pub trait FeeConfig:
 
     fn update_fees(&mut self, update: Self::Update);
 
+    /// Whether this fee config uses L2-style fees (BeforeSwapDelta + MEV tax).
+    fn l2_fees(&self) -> bool;
+
     /// Calculate MEV tax given a priority fee in wei.
-    /// Default returns 0 (no MEV tax, used by L1).
-    /// L2 implements: SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * (priority_fee -
-    /// floor)
+    /// L1 returns 0. L2 implements: SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS *
+    /// (priority_fee - floor)
     fn mev_tax(&self, _priority_fee_wei: u128) -> u128 {
         0
     }
@@ -68,6 +71,10 @@ pub trait FeeConfig:
 
 impl FeeConfig for L1FeeConfiguration {
     type Update = L1FeeUpdate;
+
+    fn l2_fees(&self) -> bool {
+        false
+    }
 
     fn protocol_fee(&self) -> u32 {
         self.protocol_fee
@@ -105,7 +112,7 @@ impl FeeConfig for L2FeeConfiguration {
     }
 
     fn swap_fee(&self) -> u32 {
-        0
+        self.lp_fee
     }
 
     fn bundle_fee(&self) -> Option<u32> {
@@ -114,6 +121,10 @@ impl FeeConfig for L2FeeConfiguration {
 
     fn fee(&self, _: bool) -> u32 {
         self.swap_fee() + self.protocol_fee()
+    }
+
+    fn l2_fees(&self) -> bool {
+        true
     }
 
     fn priority_fee_tax_floor(&self) -> u128 {
@@ -171,6 +182,7 @@ mod tests {
     fn l2_fee_config(floor: u128) -> L2FeeConfiguration {
         L2FeeConfiguration {
             is_initialized:         true,
+            lp_fee:                 0,
             creator_tax_fee_e6:     1000,
             protocol_tax_fee_e6:    2000,
             creator_swap_fee_e6:    3000,
@@ -192,10 +204,10 @@ mod tests {
     #[test]
     fn l2_mev_tax_zero_floor() {
         let cfg = l2_fee_config(0);
-        // 99 * 100_000 * 1 = 9_900_000
-        assert_eq!(cfg.mev_tax(1), 9_900_000);
-        // 99 * 100_000 * 1_000_000_000 (1 gwei) = 9_900_000_000_000_000
-        assert_eq!(cfg.mev_tax(1_000_000_000), 9_900_000_000_000_000);
+        // 99 * 120_000 * 1 = 11_880_000
+        assert_eq!(cfg.mev_tax(1), 11_880_000);
+        // 99 * 120_000 * 1_000_000_000 (1 gwei) = 11_880_000_000_000_000
+        assert_eq!(cfg.mev_tax(1_000_000_000), 11_880_000_000_000_000);
     }
 
     #[test]
@@ -215,8 +227,8 @@ mod tests {
     fn l2_mev_tax_subtracts_floor() {
         let cfg = l2_fee_config(100);
         // priority_fee=150, effective=50
-        // 99 * 100_000 * 50 = 495_000_000
-        assert_eq!(cfg.mev_tax(150), 99 * 100_000 * 50);
+        // 99 * 120_000 * 50 = 594_000_000
+        assert_eq!(cfg.mev_tax(150), 99 * 120_000 * 50);
     }
 
     #[test]

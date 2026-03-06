@@ -170,6 +170,11 @@ where
         self.pools.clone()
     }
 
+    /// Get the pool registry
+    pub fn get_registry(&self) -> T::PoolRegistry {
+        self.factory.registry()
+    }
+
     /// Get the current block number being processed
     pub fn current_block(&self) -> u64 {
         self.current_block

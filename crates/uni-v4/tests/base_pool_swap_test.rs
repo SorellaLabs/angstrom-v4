@@ -22,14 +22,14 @@ async fn test_specific_pool_at_block() {
         return;
     };
 
-    let deploy_block = 22971782u64;
-    let target_block = 23020805;
+    let deploy_block = 42966000u64;
+    let target_block = 42977290;
 
-    // Real addresses from Sepolia deployment
+    // Real addresses from Base deployment
     let pool_manager_address =
         alloy::primitives::address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
     let angstrom_l2_factory =
-        alloy::primitives::address!("0x000000000004444c5dc75cB358380D2e3dE08A90");
+        alloy::primitives::address!("0x0000000000a5f21b113a18dd18f6fbeebd01201b");
 
     // Create real provider
     let provider = Arc::new(
