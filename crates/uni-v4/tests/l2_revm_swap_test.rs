@@ -32,7 +32,7 @@ const SWAP_AMOUNTS: &[(i64, &str)] = &[
     (5_000_000, "0.05 cbBTC"),
     (10_000_000, "0.1 cbBTC"),
     (50_000_000, "0.5 cbBTC"),
-    (100_000_000, "1 cbBTC"),
+    (100_000_000, "1 cbBTC")
 ];
 
 type U160 = Uint<160, 3>;
@@ -180,8 +180,11 @@ async fn test_l2_swap_matches_onchain() {
             let label = format!("{dir_label} {size_label}");
 
             // Local: positive I256 = exact input
-            let local_result = pool_state
-                .swap_current_with_amount(I256::try_from(amount_raw).unwrap(), zero_for_one, false);
+            let local_result = pool_state.swap_current_with_amount(
+                I256::try_from(amount_raw).unwrap(),
+                zero_for_one,
+                false
+            );
 
             // Out-of-range is acceptable — the loaded tick window is finite
             let local_result = match local_result {
@@ -306,13 +309,12 @@ async fn test_l2_swap_with_mev_tax_matches_onchain() {
             let label = format!("{dir_label} {size_label} mev_tax");
 
             // Local swap with MEV tax
-            let local_result = pool_state
-                .swap_current_with_amount_and_mev_tax(
-                    I256::try_from(amount_raw).unwrap(),
-                    zero_for_one,
-                    false,
-                    Some(priority_fee)
-                );
+            let local_result = pool_state.swap_current_with_amount_and_mev_tax(
+                I256::try_from(amount_raw).unwrap(),
+                zero_for_one,
+                false,
+                Some(priority_fee)
+            );
 
             // Out-of-range is acceptable — the loaded tick window is finite
             let local_result = match local_result {
