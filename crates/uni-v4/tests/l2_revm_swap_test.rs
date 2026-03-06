@@ -123,8 +123,9 @@ async fn test_l2_swap_matches_onchain() {
         POOL_MANAGER,
         DEPLOY_BLOCK
     )
-    .with_initial_tick_range_size(6000)
+    .with_initial_tick_range_size(400)
     .with_auto_pool_creation(true)
+    .with_ticks_per_batch(400)
     .with_current_block(TARGET_BLOCK)
     .build()
     .await
@@ -257,8 +258,9 @@ async fn test_l2_swap_with_mev_tax_matches_onchain() {
         POOL_MANAGER,
         DEPLOY_BLOCK
     )
-    .with_initial_tick_range_size(6000)
+    .with_initial_tick_range_size(400)
     .with_auto_pool_creation(true)
+    .with_ticks_per_batch(400)
     .with_current_block(TARGET_BLOCK)
     .build()
     .await
