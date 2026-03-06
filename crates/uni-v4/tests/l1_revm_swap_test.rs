@@ -299,8 +299,9 @@ async fn test_l1_swap_replay_matches_onchain() {
                     Ok(r) => r
                 };
 
-                // Unlock the Angstrom hook for the current anvil block so beforeSwap doesn't revert.
-                // Read slot 3, preserve upper bits (_configStore), overwrite low 64 bits with block.number.
+                // Unlock the Angstrom hook for the current anvil block so beforeSwap doesn't
+                // revert. Read slot 3, preserve upper bits (_configStore),
+                // overwrite low 64 bits with block.number.
                 let current_block = anvil_provider
                     .get_block_number()
                     .await
