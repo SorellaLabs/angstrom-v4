@@ -9,8 +9,8 @@ use alloy::{
     eips::BlockId,
     network::Ethereum,
     node_bindings::Anvil,
-    primitives::{Address, I256, Uint, address},
-    providers::{Provider, ProviderBuilder},
+    primitives::{Address, I256, U256, Uint, address},
+    providers::{Provider, ProviderBuilder, ext::AnvilApi},
     rpc::types::Block,
     sol
 };
@@ -29,6 +29,11 @@ fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
     std::env::var("ETH_URL").ok()
 }
+
+/// Angstrom storage slot 3 packs `_lastBlockUpdated` (low 64 bits) with
+/// `_configStore` address (bits 64+).  Setting the low 64 bits to the current
+/// block number makes `_isUnlocked()` return true so the hook allows swaps.
+const ANGSTROM_LAST_BLOCK_SLOT: U256 = U256::from_limbs([3, 0, 0, 0]);
 
 // Mainnet addresses (chain_id=1)
 const ANGSTROM: Address = address!("0x0000000AA8c2Fb9b232F78D2B286dC2aE53BfAD4");
@@ -291,6 +296,23 @@ async fn test_l1_swap_replay_matches_onchain() {
                     Err(e) => panic!("Local swap failed ({label}): {e}"),
                     Ok(r) => r
                 };
+
+                // Unlock the Angstrom hook for the current anvil block so beforeSwap doesn't revert.
+                // Read slot 3, preserve upper bits (_configStore), overwrite low 64 bits with block.number.
+                let current_block = anvil_provider
+                    .get_block_number()
+                    .await
+                    .expect("failed to get block number");
+                let slot_val = anvil_provider
+                    .get_storage_at(ANGSTROM, ANGSTROM_LAST_BLOCK_SLOT)
+                    .await
+                    .expect("failed to read slot");
+                let mask = U256::from(u64::MAX);
+                let new_val = (slot_val & !mask) | U256::from(current_block + 1);
+                anvil_provider
+                    .anvil_set_storage_at(ANGSTROM, ANGSTROM_LAST_BLOCK_SLOT, new_val.into())
+                    .await
+                    .expect("failed to set storage");
 
                 // On-chain quote
                 let sqrt_price_limit =
