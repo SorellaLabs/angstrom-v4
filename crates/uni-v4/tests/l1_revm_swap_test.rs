@@ -308,7 +308,7 @@ async fn test_l1_swap_replay_matches_onchain() {
                     .await
                     .expect("failed to read slot");
                 let mask = U256::from(u64::MAX);
-                let new_val = (slot_val & !mask) | U256::from(current_block + 1);
+                let new_val = (slot_val & !mask) | U256::from(current_block);
                 anvil_provider
                     .anvil_set_storage_at(ANGSTROM, ANGSTROM_LAST_BLOCK_SLOT, new_val.into())
                     .await
