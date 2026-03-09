@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// L2 MEV tax constants from AngstromL2.sol
 /// The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap.
@@ -31,7 +31,19 @@ pub struct L2FeeConfiguration {
 }
 
 pub trait FeeConfig:
-    Debug + Clone + Copy + PartialEq + Eq + Hash + Ord + PartialOrd + Send + Sync + Unpin
+    Debug
+    + Clone
+    + Copy
+    + PartialEq
+    + Eq
+    + Hash
+    + Ord
+    + PartialOrd
+    + Send
+    + Sync
+    + Unpin
+    + Serialize
+    + DeserializeOwned
 {
     type Update: Debug + Clone + Copy + Send + Sync + Unpin;
 
