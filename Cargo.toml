@@ -14,23 +14,23 @@ uni-v4-structure = { path = "crates/uni-v4-structure" }
 uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper" }
 
 # External dependencies
-alloy-contract = { version = "1.5.2", default-features = false }
-alloy-consensus = { version = "1.5.2", default-features = false }
-alloy-eips = { version = "1.5.2", default-features = false }
-alloy-network = { version = "1.5.2", default-features = false }
-alloy-provider = { version = "1.5.2", default-features = false, features = [
+alloy-contract = { version = "1.6.3", default-features = false }
+alloy-consensus = { version = "1.6.3", default-features = false }
+alloy-eips = { version = "1.6.3", default-features = false }
+alloy-network = { version = "1.6.3", default-features = false }
+alloy-provider = { version = "1.6.3", default-features = false, features = [
   "reqwest",
   "ws",
   "rpc-api",
   "anvil-node",
 ] }
-alloy-rpc-types = { version = "1.5.2", default-features = false, features = [
+alloy-rpc-types = { version = "1.6.3", default-features = false, features = [
   "eth",
 ] }
-alloy-sol-types = { version = "1.5.4", default-features = false, features = [
+alloy-sol-types = { version = "1.5.6", default-features = false, features = [
   "json",
 ] }
-alloy-primitives = { version = "1.5.4", default-features = false, features = [
+alloy-primitives = { version = "1.5.6", default-features = false, features = [
   "map-foldhash",
   "rand",
 ] }
@@ -61,5 +61,13 @@ tokio = { version = "1.47.1", features = [
 tracing = "0"
 tracing-subscriber = "0.3.19"
 uniswap_v3_math = { git = "https://github.com/SorellaLabs/v3-math", branch = "main" }
-op-alloy-network = { version = "0.22.1", default-features = false }
-op-alloy-rpc-types = { version = "0.22.1", default-features = false }
+op-alloy-network = { version = "0.23.1", default-features = false }
+op-alloy-rpc-types = { version = "0.23.1", default-features = false }
+
+# [patch.crates-io]
+# op-alloy-rpc-types-engine = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-node/v1.16.8" }
+# op-alloy-consensus = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-node/v1.16.8" }
+# op-alloy-network = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-node/v1.16.8" }
+# op-alloy-rpc-types = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-node/v1.16.8" }
+# op-alloy = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-node/v1.16.8" }
+# alloy-op-hardforks = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-node/v1.16.8" }
