@@ -329,6 +329,14 @@ impl BaselineLiquidity {
     pub fn get_tick_spacing(&self) -> i32 {
         self.tick_spacing
     }
+
+    pub fn tick_spacing(&self) -> i32 { self.tick_spacing }
+
+    pub fn start_tick(&self) -> i32 { self.start_tick }
+
+    pub fn start_sqrt_price(&self) -> SqrtPriceX96 { self.start_sqrt_price }
+
+    pub fn start_liquidity(&self) -> u128 { self.start_liquidity }
 }
 
 /// represents the liquidity at a specified point. All operations use this

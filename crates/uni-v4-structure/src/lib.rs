@@ -338,6 +338,8 @@ impl<T: V4Network> BaselinePoolState<T> {
         .swap()
     }
 
+    pub fn liquidity(&self) -> &BaselineLiquidity { &self.liquidity }
+
     pub fn get_baseline_liquidity(&self) -> &BaselineLiquidity {
         &self.liquidity
     }
