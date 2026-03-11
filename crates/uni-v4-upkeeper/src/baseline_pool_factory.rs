@@ -743,10 +743,10 @@ where
         pool_state: &BaselinePoolState<T>,
         block_number: Option<u64>
     ) -> bool {
-        let baseline = pool_state.get_baseline_liquidity();
+        let baseline = pool_state.liquidity();
 
-        let current_tick = baseline.get_current_tick();
-        let tick_spacing = baseline.get_tick_spacing();
+        let current_tick = baseline.start_tick();
+        let tick_spacing = baseline.tick_spacing();
 
         // Get min and max initialized ticks
         let Some(min_tick) = baseline.get_min_initialized_tick() else {
