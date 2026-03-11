@@ -164,7 +164,7 @@ impl<T: V4Network> UniswapPools<T> {
                         continue;
                     };
 
-                    let baseline = pool.value_mut().get_baseline_liquidity_mut();
+                    let baseline = pool.value_mut().liquidity_mut();
 
                     // Merge new ticks with existing ones
                     baseline.initialized_ticks_mut().extend(ticks);
