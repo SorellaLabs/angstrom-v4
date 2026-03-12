@@ -194,14 +194,14 @@ async fn test_pool_state_consistency() {
     for pool_id in &tracked_pool_ids {
         if let Some(pool_ref) = updated_pools.get_pools().get(pool_id) {
             let pool_state = pool_ref.value();
-            let baseline = pool_state.get_baseline_liquidity();
+            let baseline = pool_state.liquidity();
 
             // Capture complete state
             let snapshot = PoolStateSnapshot {
-                current_tick:      baseline.get_current_tick(),
+                current_tick:      baseline.start_tick(),
                 current_liquidity: pool_state.current_liquidity(),
                 sqrt_price:        pool_state.current_price(),
-                tick_spacing:      baseline.get_tick_spacing(),
+                tick_spacing:      baseline.tick_spacing(),
                 initialized_ticks: baseline.initialized_ticks().clone()
             };
 
@@ -248,18 +248,18 @@ async fn test_pool_state_consistency() {
         match (service1_state, fresh_pool_ref) {
             (Some(service1_snapshot), Some(fresh_ref)) => {
                 let fresh = fresh_ref.value();
-                let fresh_baseline = fresh.get_baseline_liquidity();
+                let fresh_baseline = fresh.liquidity();
 
                 // Compare basic state
                 let mut mismatches = Vec::new();
                 let mut subset_valid = true;
 
                 // Check basic metrics
-                if service1_snapshot.current_tick != fresh_baseline.get_current_tick() {
+                if service1_snapshot.current_tick != fresh_baseline.start_tick() {
                     mismatches.push(format!(
                         "current tick: {} vs {}",
                         service1_snapshot.current_tick,
-                        fresh_baseline.get_current_tick()
+                        fresh_baseline.start_tick()
                     ));
                 }
                 if service1_snapshot.current_liquidity != fresh.current_liquidity() {
@@ -276,11 +276,11 @@ async fn test_pool_state_consistency() {
                         fresh.current_price()
                     ));
                 }
-                if service1_snapshot.tick_spacing != fresh_baseline.get_tick_spacing() {
+                if service1_snapshot.tick_spacing != fresh_baseline.tick_spacing() {
                     mismatches.push(format!(
                         "tick spacing: {} vs {}",
                         service1_snapshot.tick_spacing,
-                        fresh_baseline.get_tick_spacing()
+                        fresh_baseline.tick_spacing()
                     ));
                 }
 
