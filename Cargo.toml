@@ -9,9 +9,9 @@ authors = ["Sorella Labs"]
 repository = "https://github.com/SorellaLabs/uni-v4"
 
 [workspace.dependencies]
-uni-v4-common = { path = "crates/uni-v4-common" }
-uni-v4-structure = { path = "crates/uni-v4-structure" }
-uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper" }
+uni-v4-common = { path = "crates/uni-v4-common", default-features = false }
+uni-v4-structure = { path = "crates/uni-v4-structure", default-features = false }
+uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper", default-features = false }
 
 # External dependencies
 alloy-contract = { version = "1.6.3", default-features = false }
