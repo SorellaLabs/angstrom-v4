@@ -14,18 +14,18 @@ uni-v4-structure = { path = "crates/uni-v4-structure", default-features = false 
 uni-v4-upkeeper = { path = "crates/uni-v4-upkeeper", default-features = false }
 
 # External dependencies
-alloy = "1.8.2"
-alloy-contract = { version = "1.8.2", default-features = false }
-alloy-consensus = { version = "1.8.2", default-features = false }
-alloy-eips = { version = "1.8.2", default-features = false }
-alloy-network = { version = "1.8.2", default-features = false }
-alloy-provider = { version = "1.8.2", default-features = false, features = [
+alloy = "2.0.0"
+alloy-contract = { version = "2.0.0", default-features = false }
+alloy-consensus = { version = "2.0.0", default-features = false }
+alloy-eips = { version = "2.0.0", default-features = false }
+alloy-network = { version = "2.0.0", default-features = false }
+alloy-provider = { version = "2.0.0", default-features = false, features = [
   "reqwest",
   "ws",
   "rpc-api",
   "anvil-node",
 ] }
-alloy-rpc-types = { version = "1.8.2", default-features = false, features = [
+alloy-rpc-types = { version = "2.0.0", default-features = false, features = [
   "eth",
 ] }
 alloy-sol-types = { version = "1.5.6", default-features = false, features = [
@@ -62,7 +62,5 @@ tokio = { version = "1.47.1", features = [
 tracing = "0"
 tracing-subscriber = "0.3.19"
 uniswap_v3_math = { git = "https://github.com/SorellaLabs/v3-math", branch = "main" }
-# op-alloy-rpc-types = { version = "0.24.0", default-features = false }
-# op-alloy-network = { version = "0.24.0", default-features = false }
-op-alloy-network = { git = "https://github.com/ethereum-optimism/optimism", rev = "1e3ee25", default-features = false }
-op-alloy-rpc-types = { git = "https://github.com/ethereum-optimism/optimism", rev = "1e3ee25", default-features = false }
+op-alloy-network = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-reth/v2.1.0", default-features = false }
+op-alloy-consensus = { git = "https://github.com/ethereum-optimism/optimism", tag = "op-reth/v2.1.0", default-features = false }
