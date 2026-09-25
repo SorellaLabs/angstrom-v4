@@ -18,9 +18,9 @@ fn get_base_url() -> Option<String> {
 }
 
 const POOL_MANAGER: Address = address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
-const ANGSTROM_L2_FACTORY: Address = address!("0x0000000000a5f21b113a18dd18f6fbeebd01201b");
-const DEPLOY_BLOCK: u64 = 42966000;
-const TARGET_BLOCK: u64 = 42977290;
+const ANGSTROM_L2_FACTORY: Address = address!("0x00000000a9b8c6f8e2693cef534e16ed414fc4a7");
+const DEPLOY_BLOCK: u64 = 51744392;
+const TARGET_BLOCK: u64 = 51784313;
 
 const CBBTC: Address = address!("0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf");
 

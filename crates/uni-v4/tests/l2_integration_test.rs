@@ -102,10 +102,9 @@ async fn test_pool_state_consistency() {
         return;
     };
 
-    // block range were 50k liq was added
-    let deploy_block = 42966000; // Deployment block
+    let deploy_block = 51744392; // Deployment block
     // range were a modify liquidity occurs
-    let initial_block = 42975000;
+    let initial_block = 51752365;
     let num_blocks_to_stream = 10;
     let final_block = initial_block + num_blocks_to_stream;
 
@@ -113,7 +112,7 @@ async fn test_pool_state_consistency() {
     let pool_manager_address =
         alloy::primitives::address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
     let angstrom_l2_factory =
-        alloy::primitives::address!("0x0000000000a5f21b113a18dd18f6fbeebd01201b");
+        alloy::primitives::address!("0x00000000a9b8c6f8e2693cef534e16ed414fc4a7");
 
     let address_book = L2AddressBook::new(angstrom_l2_factory);
     let pool_registry = L2PoolRegistry::default();
