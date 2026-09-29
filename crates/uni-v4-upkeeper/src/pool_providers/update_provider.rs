@@ -446,10 +446,8 @@ where
                 | PoolUpdate::FeeUpdate { pool_id, .. } => {
                     affected_pools.insert(*pool_id);
                 }
-                PoolUpdate::ChainSpecific { pool_id, update } => {
-                    if update.is_pool_affected() {
-                        affected_pools.insert(*pool_id);
-                    }
+                PoolUpdate::ChainSpecific { pool_id, update } if update.is_pool_affected() => {
+                    affected_pools.insert(*pool_id);
                 }
                 _ => {}
             }

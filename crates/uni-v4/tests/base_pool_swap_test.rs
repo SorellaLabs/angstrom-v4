@@ -4,13 +4,13 @@ use alloy::{
     primitives::{I256, U256},
     providers::ProviderBuilder
 };
-use op_alloy_network::Optimism;
+use base_common_network::Base;
 use uni_v4::l2_structure::{L2AddressBook, pool_registry::L2PoolRegistry};
 use uni_v4_upkeeper::pool_manager_service_builder::PoolManagerServiceBuilder;
 
 fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("BASE_URL").ok()
+    std::env::var("BASE_WS_URL").ok()
 }
 
 #[tokio::test]
@@ -18,7 +18,7 @@ async fn test_specific_pool_at_block() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No BASE_URL SET, returning");
+        println!("No BASE_WS_URL SET, returning");
         return;
     };
 
@@ -33,7 +33,7 @@ async fn test_specific_pool_at_block() {
 
     // Create real provider
     let provider = Arc::new(
-        ProviderBuilder::<_, _, Optimism>::default()
+        ProviderBuilder::<_, _, Base>::default()
             .with_recommended_fillers()
             .connect(&eth_url)
             .await

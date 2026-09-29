@@ -2,6 +2,7 @@
 name = "uni-v4"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 repository.workspace = true
 
@@ -16,8 +17,8 @@ alloy = { workspace = true, features = ["full", "node-bindings"] }
 futures.workspace = true
 tokio.workspace = true
 dotenv = "0"
-op-alloy-network.workspace = true
-op-alloy-rpc-types.workspace = true
+base-common-network.workspace = true
+base-common-rpc-types.workspace = true
 uni-v4-common.workspace = true
 uni-v4-structure.workspace = true
 uni-v4-upkeeper.workspace = true

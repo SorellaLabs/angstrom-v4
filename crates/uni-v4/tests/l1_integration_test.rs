@@ -23,10 +23,10 @@ use uni_v4_upkeeper::{
     pool_manager_service_builder::PoolManagerServiceBuilder, slot0::NoOpSlot0Stream
 };
 
-// Test configuration - Uses ETH_URL environment variable
+// Test configuration - Uses ETH_WS_URL environment variable
 pub fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("ETH_URL").ok()
+    std::env::var("ETH_WS_URL").ok()
 }
 
 use futures::future::BoxFuture;
@@ -96,7 +96,7 @@ async fn test_pool_state_consistency() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No ETH_URL SET, returning");
+        println!("No ETH_WS_URL SET, returning");
         return;
     };
 

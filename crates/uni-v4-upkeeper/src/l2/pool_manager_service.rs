@@ -1,7 +1,7 @@
 use alloy_primitives::aliases::{I24, U24};
 use alloy_provider::Provider;
+use base_common_network::Base;
 use futures::Stream;
-use op_alloy_network::Optimism;
 use uni_v4_common::PoolUpdate;
 use uni_v4_structure::{
     L2FeeConfiguration, PoolId, PoolKey, l2_structure::pool_updates::L2PoolUpdate,
@@ -15,13 +15,13 @@ use crate::{
     slot0::Slot0Stream
 };
 
-impl<P, Event, S> PoolEventProcessor<Optimism> for PoolManagerService<P, Optimism, Event, S>
+impl<P, Event, S> PoolEventProcessor<Base> for PoolManagerService<P, Base, Event, S>
 where
-    P: Provider<Optimism> + Clone + Unpin + 'static,
-    Event: PoolEventStream<Optimism>,
-    BaselinePoolFactory<P, Optimism>: Stream<Item = UpdateMessage<Optimism>> + Unpin,
+    P: Provider<Base> + Clone + Unpin + 'static,
+    Event: PoolEventStream<Base>,
+    BaselinePoolFactory<P, Base>: Stream<Item = UpdateMessage<Base>> + Unpin,
     S: Slot0Stream,
-    P: ProviderChainInitialization<Optimism>
+    P: ProviderChainInitialization<Base>
 {
     fn handle_chain_specific_update(&mut self, _: PoolId, update: &L2PoolUpdate) {
         match update {

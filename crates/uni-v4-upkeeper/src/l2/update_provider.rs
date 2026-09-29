@@ -7,9 +7,9 @@ use alloy_primitives::{
 use alloy_provider::Provider;
 use alloy_rpc_types::Filter;
 use alloy_sol_types::SolEvent;
+use base_common_network::Base;
 use futures::StreamExt;
 use itertools::Itertools;
-use op_alloy_network::Optimism;
 pub use types::*;
 use uni_v4_common::{PoolUpdate, V4Network};
 use uni_v4_structure::{
@@ -79,7 +79,7 @@ mod types {
 }
 
 /// Batch-fetch `priorityFeeTaxFloor` for a set of hook addresses.
-async fn fetch_hook_floors<P: Provider<Optimism>>(
+async fn fetch_hook_floors<P: Provider<Base>>(
     provider: &P,
     hooks: HashSet<Address>
 ) -> HashMap<Address, u128> {
@@ -97,15 +97,15 @@ async fn fetch_hook_floors<P: Provider<Optimism>>(
         .collect()
 }
 
-impl<P> ProviderChainUpdate<Optimism> for PoolUpdateProvider<P, Optimism>
+impl<P> ProviderChainUpdate<Base> for PoolUpdateProvider<P, Base>
 where
-    P: Provider<Optimism>
+    P: Provider<Base>
 {
     async fn fetch_chain_data(
         &mut self,
         from_block: u64,
         to_block: u64
-    ) -> Result<Vec<PoolUpdate<Optimism>>, PoolUpdateError> {
+    ) -> Result<Vec<PoolUpdate<Base>>, PoolUpdateError> {
         let logs = self.fetch_l2_factory_logs(from_block, to_block).await?;
 
         // Pre-scan for unique hook addresses from PoolCreated events
@@ -125,9 +125,9 @@ where
     }
 }
 
-impl<P> PoolUpdateProvider<P, Optimism>
+impl<P> PoolUpdateProvider<P, Base>
 where
-    P: Provider<Optimism> + 'static
+    P: Provider<Base> + 'static
 {
     async fn fetch_l2_factory_logs(
         &self,
@@ -156,7 +156,7 @@ where
         &mut self,
         logs: Vec<alloy_rpc_types::Log>,
         hook_floors: &HashMap<Address, u128>
-    ) -> Vec<PoolUpdate<Optimism>> {
+    ) -> Vec<PoolUpdate<Base>> {
         // Pre-scan: collect hook-level state that may precede PoolCreated in
         // the same block. Without this, JITTaxStatusUpdated / WithdrawOnly
         // events emitted before PoolCreated would be lost because the pool
@@ -303,7 +303,7 @@ pub async fn fetch_l2_pools<P>(
     db: &P
 ) -> Vec<PoolKeyWithFees<L2FeeConfiguration>>
 where
-    P: Provider<Optimism>
+    P: Provider<Base>
 {
     let mut filters = vec![];
 
@@ -454,7 +454,7 @@ where
 
     let mut pool_keys: HashMap<PoolId, PoolKeyWithFees<L2FeeConfiguration>> = HashMap::new();
 
-    chain_updates.for_each(|update: PoolUpdate<Optimism>| match update {
+    chain_updates.for_each(|update: PoolUpdate<Base>| match update {
         PoolUpdate::FeeUpdate { pool_id, update: cfg_update, .. } => {
             if let Some(pool) = pool_keys.get_mut(&pool_id) {
                 if let Some(fee) = cfg_update.protocol_swap_fee_e6 {
@@ -516,16 +516,16 @@ where
     pool_keys.values().cloned().collect()
 }
 
-impl<P> ProviderChainInitialization<Optimism> for P
+impl<P> ProviderChainInitialization<Base> for P
 where
-    P: Provider<Optimism>
+    P: Provider<Base>
 {
     async fn fetch_pools(
         &self,
-        address_book: <Optimism as V4Network>::AddressBook,
+        address_book: <Base as V4Network>::AddressBook,
         start_block: u64,
         end_block: u64
-    ) -> Result<Vec<PoolKeyWithFees<<Optimism as V4Network>::FeeConfig>>, PoolUpdateError> {
+    ) -> Result<Vec<PoolKeyWithFees<<Base as V4Network>::FeeConfig>>, PoolUpdateError> {
         Ok(fetch_l2_pools(start_block, end_block, address_book.angstrom_v2_factory, self).await)
     }
 }

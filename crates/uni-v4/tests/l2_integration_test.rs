@@ -1,8 +1,3 @@
-// Commented out: fails against the redeployed Base pools. The streamed state
-// misses the ETH/cbBTC liquidity increase at block 51752371 (liquidity
-// 24697007708034 vs 30501841546152 on a fresh load), which points to an issue
-// in the streaming update path. Re-enable once that is fixed.
-/*
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -15,8 +10,8 @@ use alloy::{
     eips::BlockId,
     providers::{Provider, ProviderBuilder}
 };
+use base_common_network::Base;
 use futures::Stream;
-use op_alloy_network::Optimism;
 use uni_v4::{
     PoolId,
     l2_structure::{L2AddressBook, pool_registry::L2PoolRegistry},
@@ -28,31 +23,31 @@ use uni_v4_upkeeper::{
     pool_manager_service_builder::PoolManagerServiceBuilder, slot0::NoOpSlot0Stream
 };
 
-type Block = alloy::rpc::types::Block<op_alloy_rpc_types::Transaction>;
+type Block = base_common_rpc_types::BaseBlockResponse;
 
-// Test configuration - Uses ETH_URL environment variable
+// Test configuration - Uses the BASE_WS_URL environment variable
 pub fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("BASE_URL").ok()
+    std::env::var("BASE_WS_URL").ok()
 }
 
 use futures::future::BoxFuture;
 
 /// Block stream that fetches a specific range of historical blocks
-pub struct HistoricalBlockStream<P: Provider<Optimism>> {
+pub struct HistoricalBlockStream<P: Provider<Base>> {
     provider:       Arc<P>,
     end_block:      u64,
     current_block:  u64,
     pending_future: Option<BoxFuture<'static, Option<Block>>>
 }
 
-impl<P: Provider<Optimism>> HistoricalBlockStream<P> {
+impl<P: Provider<Base>> HistoricalBlockStream<P> {
     pub fn new(provider: Arc<P>, start_block: u64, end_block: u64) -> Self {
         Self { provider, end_block, current_block: start_block, pending_future: None }
     }
 }
 
-impl<P: Provider<Optimism> + 'static> Stream for HistoricalBlockStream<P> {
+impl<P: Provider<Base> + 'static> Stream for HistoricalBlockStream<P> {
     type Item = Block;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -103,7 +98,7 @@ async fn test_pool_state_consistency() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No ETH_URL SET, returning");
+        println!("No BASE_WS_URL SET, returning");
         return;
     };
 
@@ -356,4 +351,3 @@ async fn test_pool_state_consistency() {
         assert_eq!(failures, 0, "Pool state comparison failed for {failures} pools");
     }
 }
-*/
