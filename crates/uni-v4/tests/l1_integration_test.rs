@@ -23,10 +23,10 @@ use uni_v4_upkeeper::{
     pool_manager_service_builder::PoolManagerServiceBuilder, slot0::NoOpSlot0Stream
 };
 
-// Test configuration - Uses ETH_URL environment variable
+// Test configuration - Uses ETH_WS_URL environment variable
 pub fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("ETH_URL").ok()
+    std::env::var("ETH_WS_URL").ok()
 }
 
 use futures::future::BoxFuture;
@@ -96,7 +96,7 @@ async fn test_pool_state_consistency() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No ETH_URL SET, returning");
+        println!("No ETH_WS_URL SET, returning");
         return;
     };
 
@@ -285,7 +285,8 @@ async fn test_pool_state_consistency() {
                 }
 
                 // Check initialized ticks - iterate through service1's ticks
-                // Only validate that ticks present in both services have matching values
+                // Only validate that ticks present in both services have
+                // matching values
                 for (tick, service1_tick_info) in &service1_snapshot.initialized_ticks {
                     if let Some(fresh_tick_info) = fresh_baseline.initialized_ticks().get(tick) {
                         // Service2 has this tick - check if they match

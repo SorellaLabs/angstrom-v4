@@ -138,7 +138,8 @@ where
             service.event_stream.start_tracking_pool(pool_id);
         }
 
-        // Subscribe all initial pools to slot0 stream if present (using angstrom IDs)
+        // Subscribe all initial pools to slot0 stream if present (using
+        // angstrom IDs)
         if let Some(slot0_stream) = &mut service.slot0_stream {
             let angstrom_pool_ids: HashSet<PoolId> =
                 service.factory.registry().all_angstrom_pool_ids().collect();
@@ -204,7 +205,8 @@ where
                 tracing::error!("Failed to send update via channel: {}", e);
             }
 
-            // Always process certain critical updates internally even in channel mode
+            // Always process certain critical updates internally even in
+            // channel mode
             match &update {
                 PoolUpdate::NewBlock(block) => {
                     self.current_block = *block;
@@ -449,7 +451,8 @@ where
                 self.pools.remove(pool_id);
                 self.factory.remove_pool_by_id(*pool_id);
 
-                // Unsubscribe pool from slot0 stream (pool_id here is already angstrom ID)
+                // Unsubscribe pool from slot0 stream (pool_id here is already
+                // angstrom ID)
                 if let Some(slot0_stream) = &mut self.slot0_stream {
                     slot0_stream.unsubscribe_pools(HashSet::from([*pool_id]));
                 }
@@ -471,8 +474,9 @@ where
     fn dispath_chain_specific_update(&mut self, pool_id: PoolId, update: L1PoolUpdate) {
         match update {
             L1PoolUpdate::NewPool { .. } => {
-                // CRITICAL: Process new pool to ensure it gets created in the factory
-                // This will trigger pool data loading and initialization
+                // CRITICAL: Process new pool to ensure it gets created in the
+                // factory This will trigger pool data loading
+                // and initialization
                 self.process_pool_update(PoolUpdate::ChainSpecific { pool_id, update });
             }
             L1PoolUpdate::PoolRemoved { .. } => {

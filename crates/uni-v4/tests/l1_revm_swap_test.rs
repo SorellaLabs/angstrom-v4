@@ -27,7 +27,7 @@ use uni_v4_upkeeper::{
 
 fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("ETH_URL").ok()
+    std::env::var("ETH_WS_URL").ok()
 }
 
 /// Angstrom storage slot 3 packs `_lastBlockUpdated` (low 64 bits) with
@@ -179,7 +179,7 @@ fn make_pool_key(registry: &L1PoolRegistry, pool_id: &PoolId) -> PoolKey {
 #[tokio::test]
 async fn test_l1_swap_replay_matches_onchain() {
     let Some(eth_url) = get_eth_url() else {
-        println!("No ETH_URL set, skipping");
+        println!("No ETH_WS_URL set, skipping");
         return;
     };
 
@@ -299,9 +299,10 @@ async fn test_l1_swap_replay_matches_onchain() {
                     Ok(r) => r
                 };
 
-                // Unlock the Angstrom hook for the current anvil block so beforeSwap doesn't
-                // revert. Read slot 3, preserve upper bits (_configStore),
-                // overwrite low 64 bits with block.number.
+                // Unlock the Angstrom hook for the current anvil block so
+                // beforeSwap doesn't revert. Read slot 3,
+                // preserve upper bits (_configStore), overwrite
+                // low 64 bits with block.number.
                 let current_block = anvil_provider
                     .get_block_number()
                     .await

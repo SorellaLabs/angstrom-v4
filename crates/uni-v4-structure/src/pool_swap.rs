@@ -29,8 +29,8 @@ pub struct PoolSwap<'a, T: V4Network> {
 
 impl<'a, T: V4Network> PoolSwap<'a, T> {
     pub fn swap(mut self) -> eyre::Result<PoolSwapResult<'a, T>> {
-        // We want to ensure that we set the right limits and are swapping the correct
-        // way.
+        // We want to ensure that we set the right limits and are swapping the
+        // correct way.
 
         if self.direction
             && self
@@ -50,10 +50,11 @@ impl<'a, T: V4Network> PoolSwap<'a, T> {
             if self.direction { MIN_SQRT_RATIO + U256_1 } else { MAX_SQRT_RATIO - U256_1 }
         });
 
-        // L2 BeforeSwapDelta: deduct protocol fee + MEV tax from input BEFORE AMM.
-        // This mirrors AngstromL2.sol's beforeSwap which returns a BeforeSwapDelta
-        // that reduces amountSpecified before the pool swap runs.
-        // L1 does not use BeforeSwapDelta — its protocol fee is applied after the swap.
+        // L2 BeforeSwapDelta: deduct protocol fee + MEV tax from input BEFORE
+        // AMM. This mirrors AngstromL2.sol's beforeSwap which returns a
+        // BeforeSwapDelta that reduces amountSpecified before the pool
+        // swap runs. L1 does not use BeforeSwapDelta — its protocol fee
+        // is applied after the swap.
         let (before_swap_input_deduction, before_swap_output_deduction) =
             if self.fee_config.l2_fees() && !self.is_bundle && exact_input {
                 let protocol_fee_rate = self.fee_config.protocol_fee();
@@ -63,8 +64,9 @@ impl<'a, T: V4Network> PoolSwap<'a, T> {
                 if protocol_fee_rate > 0 {
                     let input_amount = self.target_amount.unsigned_abs();
 
-                    // MEV tax is on ETH. If ETH is the input token, subtract it first
-                    // (matches Solidity: `if (etherIsInput) inputAmount -= swapTax`)
+                    // MEV tax is on ETH. If ETH is the input token, subtract it
+                    // first (matches Solidity: `if
+                    // (etherIsInput) inputAmount -= swapTax`)
                     let taxable_input = if ether_is_input {
                         input_amount.saturating_sub(U256::from(mev_tax))
                     } else {
@@ -75,11 +77,12 @@ impl<'a, T: V4Network> PoolSwap<'a, T> {
                         taxable_input * U256::from(protocol_fee_rate) / U256::from(1_000_000u32);
 
                     if ether_is_input {
-                        // ETH→CBBTC: both mev_tax and fee deducted from input (specified)
+                        // ETH→CBBTC: both mev_tax and fee deducted from input
+                        // (specified)
                         (mev_tax + fee_amount.saturating_to::<u128>(), 0u128)
                     } else {
-                        // CBBTC→ETH: fee from input (specified), mev_tax from output
-                        // (unspecified/ETH)
+                        // CBBTC→ETH: fee from input (specified), mev_tax from
+                        // output (unspecified/ETH)
                         (fee_amount.saturating_to::<u128>(), mev_tax)
                     }
                 } else if mev_tax > 0 {

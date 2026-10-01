@@ -7,20 +7,20 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
     sol
 };
-use op_alloy_network::Optimism;
+use base_common_network::Base;
 use uni_v4::l2_structure::{L2AddressBook, pool_registry::L2PoolRegistry};
 use uni_v4_structure::pool_registry::PoolRegistry;
 use uni_v4_upkeeper::pool_manager_service_builder::PoolManagerServiceBuilder;
 
 fn get_base_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("BASE_URL").ok()
+    std::env::var("BASE_WS_URL").ok()
 }
 
 const POOL_MANAGER: Address = address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
-const ANGSTROM_L2_FACTORY: Address = address!("0x0000000000a5f21b113a18dd18f6fbeebd01201b");
-const DEPLOY_BLOCK: u64 = 42966000;
-const TARGET_BLOCK: u64 = 42977290;
+const ANGSTROM_L2_FACTORY: Address = address!("0x00000000a9b8c6f8e2693cef534e16ed414fc4a7");
+const DEPLOY_BLOCK: u64 = 51744392;
+const TARGET_BLOCK: u64 = 51784313;
 
 const CBBTC: Address = address!("0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf");
 
@@ -106,12 +106,12 @@ fn make_pool_key(registry: &L2PoolRegistry, pool_id: &alloy::primitives::B256) -
 #[tokio::test]
 async fn test_l2_swap_matches_onchain() {
     let Some(base_url) = get_base_url() else {
-        println!("No BASE_URL set, skipping");
+        println!("No BASE_WS_URL set, skipping");
         return;
     };
 
     let provider = Arc::new(
-        ProviderBuilder::<_, _, Optimism>::default()
+        ProviderBuilder::<_, _, Base>::default()
             .with_recommended_fillers()
             .connect(&base_url)
             .await
@@ -169,8 +169,9 @@ async fn test_l2_swap_matches_onchain() {
 
     println!("SwapQuoter deployed at {:?}", quoter.address());
 
-    // Must set gas_price >= basefee for the quoter call, otherwise the L2 hook's
-    // `tx.gasprice - block.basefee` underflows in uint256 and reverts.
+    // Must set gas_price >= basefee for the quoter call, otherwise the L2
+    // hook's `tx.gasprice - block.basefee` underflows in uint256 and
+    // reverts.
     let block = anvil_provider
         .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
         .await
@@ -241,12 +242,12 @@ async fn test_l2_swap_matches_onchain() {
 #[tokio::test]
 async fn test_l2_swap_with_mev_tax_matches_onchain() {
     let Some(base_url) = get_base_url() else {
-        println!("No BASE_URL set, skipping");
+        println!("No BASE_WS_URL set, skipping");
         return;
     };
 
     let provider = Arc::new(
-        ProviderBuilder::<_, _, Optimism>::default()
+        ProviderBuilder::<_, _, Base>::default()
             .with_recommended_fillers()
             .connect(&base_url)
             .await

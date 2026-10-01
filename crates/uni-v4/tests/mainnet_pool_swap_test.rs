@@ -10,7 +10,7 @@ use uni_v4_upkeeper::pool_manager_service_builder::PoolManagerServiceBuilder;
 
 fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("ETH_URL").ok()
+    std::env::var("ETH_WS_URL").ok()
 }
 
 #[tokio::test]
@@ -18,7 +18,7 @@ async fn test_specific_pool_at_block() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No ETH_URL SET, returning");
+        println!("No ETH_WS_URL SET, returning");
         return;
     };
 

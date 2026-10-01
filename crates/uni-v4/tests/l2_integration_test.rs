@@ -10,8 +10,8 @@ use alloy::{
     eips::BlockId,
     providers::{Provider, ProviderBuilder}
 };
+use base_common_network::Base;
 use futures::Stream;
-use op_alloy_network::Optimism;
 use uni_v4::{
     PoolId,
     l2_structure::{L2AddressBook, pool_registry::L2PoolRegistry},
@@ -23,31 +23,31 @@ use uni_v4_upkeeper::{
     pool_manager_service_builder::PoolManagerServiceBuilder, slot0::NoOpSlot0Stream
 };
 
-type Block = alloy::rpc::types::Block<op_alloy_rpc_types::Transaction>;
+type Block = base_common_rpc_types::BaseBlockResponse;
 
-// Test configuration - Uses ETH_URL environment variable
+// Test configuration - Uses the BASE_WS_URL environment variable
 pub fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("BASE_URL").ok()
+    std::env::var("BASE_WS_URL").ok()
 }
 
 use futures::future::BoxFuture;
 
 /// Block stream that fetches a specific range of historical blocks
-pub struct HistoricalBlockStream<P: Provider<Optimism>> {
+pub struct HistoricalBlockStream<P: Provider<Base>> {
     provider:       Arc<P>,
     end_block:      u64,
     current_block:  u64,
     pending_future: Option<BoxFuture<'static, Option<Block>>>
 }
 
-impl<P: Provider<Optimism>> HistoricalBlockStream<P> {
+impl<P: Provider<Base>> HistoricalBlockStream<P> {
     pub fn new(provider: Arc<P>, start_block: u64, end_block: u64) -> Self {
         Self { provider, end_block, current_block: start_block, pending_future: None }
     }
 }
 
-impl<P: Provider<Optimism> + 'static> Stream for HistoricalBlockStream<P> {
+impl<P: Provider<Base> + 'static> Stream for HistoricalBlockStream<P> {
     type Item = Block;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -98,14 +98,13 @@ async fn test_pool_state_consistency() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No ETH_URL SET, returning");
+        println!("No BASE_WS_URL SET, returning");
         return;
     };
 
-    // block range were 50k liq was added
-    let deploy_block = 42966000; // Deployment block
+    let deploy_block = 51744392; // Deployment block
     // range were a modify liquidity occurs
-    let initial_block = 42975000;
+    let initial_block = 51752365;
     let num_blocks_to_stream = 10;
     let final_block = initial_block + num_blocks_to_stream;
 
@@ -113,7 +112,7 @@ async fn test_pool_state_consistency() {
     let pool_manager_address =
         alloy::primitives::address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
     let angstrom_l2_factory =
-        alloy::primitives::address!("0x0000000000a5f21b113a18dd18f6fbeebd01201b");
+        alloy::primitives::address!("0x00000000a9b8c6f8e2693cef534e16ed414fc4a7");
 
     let address_book = L2AddressBook::new(angstrom_l2_factory);
     let pool_registry = L2PoolRegistry::default();
@@ -285,7 +284,8 @@ async fn test_pool_state_consistency() {
                 }
 
                 // Check initialized ticks - iterate through service1's ticks
-                // Only validate that ticks present in both services have matching values
+                // Only validate that ticks present in both services have
+                // matching values
                 for (tick, service1_tick_info) in &service1_snapshot.initialized_ticks {
                     if let Some(fresh_tick_info) = fresh_baseline.initialized_ticks().get(tick) {
                         // Service2 has this tick - check if they match

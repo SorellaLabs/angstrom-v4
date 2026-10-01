@@ -4,13 +4,13 @@ use alloy::{
     primitives::{I256, U256},
     providers::ProviderBuilder
 };
-use op_alloy_network::Optimism;
+use base_common_network::Base;
 use uni_v4::l2_structure::{L2AddressBook, pool_registry::L2PoolRegistry};
 use uni_v4_upkeeper::pool_manager_service_builder::PoolManagerServiceBuilder;
 
 fn get_eth_url() -> Option<String> {
     dotenv::dotenv().ok();
-    std::env::var("BASE_URL").ok()
+    std::env::var("BASE_WS_URL").ok()
 }
 
 #[tokio::test]
@@ -18,22 +18,22 @@ async fn test_specific_pool_at_block() {
     // Get ETH URL from environment
     let eth_url = get_eth_url();
     let Some(eth_url) = eth_url else {
-        println!("No BASE_URL SET, returning");
+        println!("No BASE_WS_URL SET, returning");
         return;
     };
 
-    let deploy_block = 42966000u64;
-    let target_block = 42977290;
+    let deploy_block = 51744392u64;
+    let target_block = 51784313;
 
     // Real addresses from Base deployment
     let pool_manager_address =
         alloy::primitives::address!("0x498581ff718922c3f8e6a244956af099b2652b2b");
     let angstrom_l2_factory =
-        alloy::primitives::address!("0x0000000000a5f21b113a18dd18f6fbeebd01201b");
+        alloy::primitives::address!("0x00000000a9b8c6f8e2693cef534e16ed414fc4a7");
 
     // Create real provider
     let provider = Arc::new(
-        ProviderBuilder::<_, _, Optimism>::default()
+        ProviderBuilder::<_, _, Base>::default()
             .with_recommended_fillers()
             .connect(&eth_url)
             .await

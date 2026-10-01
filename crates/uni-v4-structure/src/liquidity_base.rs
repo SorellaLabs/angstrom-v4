@@ -70,8 +70,8 @@ impl BaselineLiquidity {
         // should never overflow
         let liquidity_delta = i128::try_from(liquidity_delta).unwrap();
 
-        // Case where we surround the current position (greater than the position on
-        // both sides);
+        // Case where we surround the current position (greater than the
+        // position on both sides);
         if tick_lower < min_tick_init && tick_upper > max_tick_init {
             // we don't flip any ticks here as there outside of our loaded band
             if liquidity_delta.is_negative() {
@@ -141,12 +141,14 @@ impl BaselineLiquidity {
                 self.initialized_ticks.remove(&tick_lower);
             }
 
-            // if we started un-init or we became un-init, we need to flip the tick
+            // if we started un-init or we became un-init, we need to flip the
+            // tick
             if start_am == 0 || end_am == 0 {
                 flip_tick(&mut self.tick_bitmap, tick_lower, self.tick_spacing).unwrap();
             }
 
-            // if we are less than start tick, means that we effect slot0 and need to add.
+            // if we are less than start tick, means that we effect slot0 and
+            // need to add.
             if tick_lower <= self.start_tick {
                 if liquidity_delta.is_negative() {
                     self.start_liquidity -= liquidity_delta.unsigned_abs();
@@ -178,13 +180,15 @@ impl BaselineLiquidity {
                 self.initialized_ticks.remove(&tick_upper);
             }
 
-            // if we started un-init or we became un-init, we need to flip the tick
+            // if we started un-init or we became un-init, we need to flip the
+            // tick
             if start_am == 0 || end_am == 0 {
                 flip_tick(&mut self.tick_bitmap, tick_upper, self.tick_spacing).unwrap();
             }
 
-            // if our upper tick is ge the start tick, and lower is out of range, means that
-            // the current liq needs to be updated.
+            // if our upper tick is ge the start tick, and lower is out of
+            // range, means that the current liq needs to be
+            // updated.
             if tick_upper >= self.start_tick {
                 if liquidity_delta.is_negative() {
                     self.start_liquidity -= liquidity_delta.unsigned_abs();
@@ -202,14 +206,14 @@ impl BaselineLiquidity {
         let zfo = self.start_sqrt_price >= price;
         let tick_at_price = get_tick_at_sqrt_ratio(price.into())?;
 
-        // now that we have the direction, what we need to do is calculate what the
-        // current liquidity will be.
+        // now that we have the direction, what we need to do is calculate what
+        // the current liquidity will be.
         let current_liquidity: i128 = self.start_liquidity.saturating_into();
         // if we are going down
         // let current_tick = self.start_tick;
         let liquidity = if zfo {
-            // we want to sort high to low, so that as iterator is consumed, we are going
-            // down
+            // we want to sort high to low, so that as iterator is consumed, we
+            // are going down
             self.initialized_ticks
                 .iter()
                 .filter(|(t, _)| *t < &self.start_tick)

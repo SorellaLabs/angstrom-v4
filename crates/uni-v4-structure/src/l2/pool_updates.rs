@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, B256};
-use op_alloy_network::Optimism;
+use base_common_network::Base;
 
 use crate::{BaselinePoolState, UpdatePool};
 
@@ -23,7 +23,7 @@ pub enum L2PoolUpdate {
     }
 }
 
-impl UpdatePool<Optimism> for L2PoolUpdate {
+impl UpdatePool<Base> for L2PoolUpdate {
     fn should_notify_waiters(&self) -> bool {
         false
     }
@@ -32,7 +32,7 @@ impl UpdatePool<Optimism> for L2PoolUpdate {
         true
     }
 
-    fn update_pool(&self, _: &mut BaselinePoolState<Optimism>) {}
+    fn update_pool(&self, _: &mut BaselinePoolState<Base>) {}
 
     fn is_pool_affected(&self) -> bool {
         match self {

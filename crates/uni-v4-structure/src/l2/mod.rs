@@ -1,4 +1,4 @@
-use op_alloy_network::Optimism;
+use base_common_network::Base;
 
 use crate::{L2FeeConfiguration, V4Network, l2::pool_registry::L2PoolRegistry};
 mod address_book;
@@ -7,7 +7,7 @@ pub mod pool_registry;
 pub mod pool_updates;
 use pool_updates::L2PoolUpdate;
 
-impl V4Network for Optimism {
+impl V4Network for Base {
     type AddressBook = L2AddressBook;
     type FeeConfig = L2FeeConfiguration;
     type PoolRegistry = L2PoolRegistry;
