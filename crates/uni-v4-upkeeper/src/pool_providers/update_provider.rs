@@ -259,8 +259,8 @@ where
             return Ok(updates);
         }
 
-        // Create pool topics for filtering - tracked_pools already contains Uniswap
-        // pool IDs
+        // Create pool topics for filtering - tracked_pools already contains
+        // Uniswap pool IDs
         let pool_topics: Vec<_> = self
             .tracked_pools
             .iter()
@@ -391,7 +391,8 @@ where
         while current <= to_block {
             let end = (current + self.reorg_lookback_block_chunk - 1).min(to_block);
 
-            // Use the shared helper with store_in_history = false for backfilling
+            // Use the shared helper with store_in_history = false for
+            // backfilling
             let chunk_updates = self
                 .process_events_for_block_range(current, end, false)
                 .await?;
@@ -468,7 +469,8 @@ where
             .current_block
             .saturating_sub(self.reorg_detection_blocks - 1);
 
-        // 1. First, emit the reorg event so the pipeline knows a reorg is happening
+        // 1. First, emit the reorg event so the pipeline knows a reorg is
+        //    happening
         updates.push(PoolUpdate::Reorg { from_block: reorg_start, to_block: self.current_block });
 
         // 2. Get inverse liquidity events
@@ -587,13 +589,15 @@ where
             // Update current block
             self.current_block = block_number;
 
-            // Clean up old events from history to maintain exactly reorg_detection_blocks
+            // Clean up old events from history to maintain exactly
+            // reorg_detection_blocks
             let cutoff_block = self
                 .current_block
                 .saturating_sub(self.reorg_detection_blocks - 1);
             self.event_history.retain(|e| e.block >= cutoff_block);
         } else if block_number < self.current_block {
-            // Block is behind our current block, this shouldn't happen in normal operation
+            // Block is behind our current block, this shouldn't happen in
+            // normal operation
             tracing::warn!(
                 "Received old block {} when current block is {}",
                 block_number,
@@ -702,8 +706,9 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
 
-        // If we are processing something, we don't want to poll the block stream as
-        // this could cause panics as the update provider has moved.
+        // If we are processing something, we don't want to poll the block
+        // stream as this could cause panics as the update provider has
+        // moved.
         if let Some(mut processing) = this.processing.take() {
             if let Poll::Ready((provider, new_updates)) = processing.poll_unpin(cx) {
                 this.update_provider = Some(provider);

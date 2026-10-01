@@ -169,8 +169,9 @@ async fn test_l2_swap_matches_onchain() {
 
     println!("SwapQuoter deployed at {:?}", quoter.address());
 
-    // Must set gas_price >= basefee for the quoter call, otherwise the L2 hook's
-    // `tx.gasprice - block.basefee` underflows in uint256 and reverts.
+    // Must set gas_price >= basefee for the quoter call, otherwise the L2
+    // hook's `tx.gasprice - block.basefee` underflows in uint256 and
+    // reverts.
     let block = anvil_provider
         .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
         .await

@@ -324,9 +324,10 @@ where
                 BaselinePoolFactoryError::PoolDataLoading(format!("Failed to load tick data: {e}"))
             })?;
 
-        // Use the actual last tick from the contract response to advance correctly.
-        // The contract scans by bitmap positions (each tick_spacing apart), so
-        // tick_start +/- num_ticks is wrong (raw ticks vs bitmap positions).
+        // Use the actual last tick from the contract response to advance
+        // correctly. The contract scans by bitmap positions (each
+        // tick_spacing apart), so tick_start +/- num_ticks is wrong
+        // (raw ticks vs bitmap positions).
         let next_tick = ticks.last().map(|t| t.tick.as_i32()).unwrap_or_else(|| {
             if zero_for_one {
                 tick_start.as_i32() - (num_ticks as i32 * tick_spacing)
@@ -501,9 +502,10 @@ where
                 BaselinePoolFactoryError::PoolDataLoading(format!("Failed to load tick data: {e}"))
             })?;
 
-        // Use the actual last tick from the contract response to advance correctly.
-        // The contract scans by bitmap positions (each tick_spacing apart), so
-        // tick_start +/- num_ticks is wrong (raw ticks vs bitmap positions).
+        // Use the actual last tick from the contract response to advance
+        // correctly. The contract scans by bitmap positions (each
+        // tick_spacing apart), so tick_start +/- num_ticks is wrong
+        // (raw ticks vs bitmap positions).
         let next_tick = ticks.last().map(|t| t.tick.as_i32()).unwrap_or_else(|| {
             if zero_for_one {
                 tick_start.as_i32() - (num_ticks as i32 * tick_spacing)

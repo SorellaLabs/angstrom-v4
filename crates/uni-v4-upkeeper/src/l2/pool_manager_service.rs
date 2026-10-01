@@ -78,8 +78,9 @@ where
     fn dispath_chain_specific_update(&mut self, pool_id: PoolId, update: L2PoolUpdate) {
         match update {
             L2PoolUpdate::NewPool { .. } => {
-                // CRITICAL: Process new pool to ensure it gets created in the factory
-                // This will trigger pool data loading and initialization
+                // CRITICAL: Process new pool to ensure it gets created in the
+                // factory This will trigger pool data loading
+                // and initialization
                 self.process_pool_update(PoolUpdate::ChainSpecific { pool_id, update });
             }
         }

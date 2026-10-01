@@ -428,10 +428,11 @@ where
                 }
             })
         } else {
-            // PriorityFeeTaxFloorUpdated events are dropped — floor values come from
-            // latest on-chain state via fetch_hook_floors() RPC calls above.
-            // JITTaxStatusUpdated and WithdrawOnly events are dropped — their state
-            // is collected in the first pass and applied during pool construction.
+            // PriorityFeeTaxFloorUpdated events are dropped — floor values come
+            // from latest on-chain state via fetch_hook_floors()
+            // RPC calls above. JITTaxStatusUpdated and WithdrawOnly
+            // events are dropped — their state is collected in the
+            // first pass and applied during pool construction.
             None
         }
     });

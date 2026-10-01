@@ -74,7 +74,8 @@ impl<P: Provider + 'static> Stream for CompletedBlockStream<P> {
                 }
             }
         } else {
-            // Normal mode (unchanged, but update gap detection to || for better hash proof)
+            // Normal mode (unchanged, but update gap detection to || for better
+            // hash proof)
             while let Poll::Ready(data) = this.block_stream.poll_next_unpin(cx) {
                 match data {
                     Some(new_block) => {

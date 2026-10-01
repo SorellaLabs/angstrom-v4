@@ -284,7 +284,8 @@ async fn test_pool_state_consistency() {
                 }
 
                 // Check initialized ticks - iterate through service1's ticks
-                // Only validate that ticks present in both services have matching values
+                // Only validate that ticks present in both services have
+                // matching values
                 for (tick, service1_tick_info) in &service1_snapshot.initialized_ticks {
                     if let Some(fresh_tick_info) = fresh_baseline.initialized_ticks().get(tick) {
                         // Service2 has this tick - check if they match
